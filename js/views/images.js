@@ -11,6 +11,11 @@ const ImagesView = (() => {
     let savedProgrammeView = null;
     let currentCatalogueId = '';
 
+    // === Audit tab state ===
+    let auditSelectedChannels = [];
+    let auditResults = [];
+    let auditInProgress = false;
+
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
         container.innerHTML = `
@@ -21,6 +26,7 @@ const ImagesView = (() => {
             <div class="view-tabs">
                 <button class="view-tab active" data-tab="schedule">By Schedule</button>
                 <button class="view-tab" data-tab="programme">By Programme</button>
+                <button class="view-tab" data-tab="audit">Image Audit</button>
             </div>
 
             <div id="tab-schedule" class="tab-panel active">
@@ -96,6 +102,59 @@ const ImagesView = (() => {
                 </div>
                 <div id="prog-results"></div>
             </div>
+
+            <div id="tab-audit" class="tab-panel">
+                <div class="filter-bar">
+                    <div class="form-group" style="flex:1;min-width:300px">
+                        <label>Add Channels</label>
+                        <input type="text" id="audit-channel-search" class="input" placeholder="Type to search and add channels..." style="width:100%" autocomplete="off">
+                        <div id="audit-channel-dropdown" class="channel-dropdown"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Saved Lists</label>
+                        <select id="audit-saved-lists" class="select" style="min-width:180px">
+                            <option value="">Load a saved list...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <div style="display:flex;gap:6px">
+                            <button id="audit-save-list" class="btn btn-sm btn-secondary">Save List</button>
+                            <button id="audit-delete-list" class="btn btn-sm btn-secondary">Delete</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="audit-selected-chips" style="display:none;margin-bottom:16px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">SELECTED CHANNELS</span>
+                        <button id="audit-clear-all" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Clear All</button>
+                    </div>
+                    <div id="audit-chips-container" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+                </div>
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="audit-start" class="input" style="min-width:160px" value="${today}">
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Days</label>
+                        <select id="audit-days" class="select" style="min-width:120px">
+                            <option value="1" selected>1 day</option>
+                            <option value="2">2 days</option>
+                            <option value="3">3 days</option>
+                            <option value="5">5 days</option>
+                            <option value="7">7 days</option>
+                            <option value="14">14 days</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="audit-run" class="btn btn-primary">Run Audit</button>
+                    </div>
+                </div>
+                <div id="audit-progress" style="display:none"></div>
+                <div id="audit-results"></div>
+            </div>
         `;
 
         // Tab switching
@@ -122,7 +181,10 @@ const ImagesView = (() => {
             if (e.key === 'Enter') searchProgrammes();
         });
 
-        // Load data for both tabs in parallel
+        // Audit tab setup
+        setupAuditTab();
+
+        // Load data for all tabs in parallel
         await Promise.all([loadAllChannels(), loadCatalogues()]);
     }
 
@@ -1150,5 +1212,469 @@ const ImagesView = (() => {
         document.body.appendChild(overlay);
     }
 
+    // ============================================================
+    // AUDIT TAB
+    // ============================================================
+
+    function setupAuditTab() {
+        loadSavedChannelLists();
+        setupAuditChannelSearch();
+        populateSavedListsDropdown();
+
+        document.getElementById('audit-run').addEventListener('click', runAudit);
+        document.getElementById('audit-save-list').addEventListener('click', saveChannelList);
+        document.getElementById('audit-delete-list').addEventListener('click', deleteChannelList);
+        document.getElementById('audit-saved-lists').addEventListener('change', loadChannelList);
+        document.getElementById('audit-clear-all').addEventListener('click', () => {
+            auditSelectedChannels = [];
+            renderSelectedChips();
+        });
+    }
+
+    function setupAuditChannelSearch() {
+        const input = document.getElementById('audit-channel-search');
+        const dropdown = document.getElementById('audit-channel-dropdown');
+
+        input.addEventListener('focus', () => { if (input.value.trim()) showAuditDropdown(); });
+        input.addEventListener('input', () => showAuditDropdown());
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#audit-channel-search') && !e.target.closest('#audit-channel-dropdown')) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    function showAuditDropdown() {
+        const input = document.getElementById('audit-channel-search');
+        const dropdown = document.getElementById('audit-channel-dropdown');
+        const query = (input.value || '').toLowerCase().trim();
+
+        if (!query) { dropdown.style.display = 'none'; return; }
+
+        if (allChannels.length === 0) {
+            dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        const selectedIds = new Set(auditSelectedChannels.map(ch => ch.id));
+        const filtered = allChannels.filter(ch =>
+            !selectedIds.has(ch.id) && (ch.title || '').toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        dropdown.innerHTML = '';
+        filtered.slice(0, 50).forEach(ch => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
+            item.addEventListener('click', () => {
+                auditSelectedChannels.push({ id: ch.id, title: ch.title });
+                renderSelectedChips();
+                input.value = '';
+                dropdown.style.display = 'none';
+                input.focus();
+            });
+            dropdown.appendChild(item);
+        });
+
+        if (filtered.length > 50) {
+            const more = document.createElement('div');
+            more.className = 'dropdown-empty';
+            more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
+            dropdown.appendChild(more);
+        }
+        dropdown.style.display = 'block';
+    }
+
+    function renderSelectedChips() {
+        const wrapper = document.getElementById('audit-selected-chips');
+        const container = document.getElementById('audit-chips-container');
+
+        if (auditSelectedChannels.length === 0) {
+            wrapper.style.display = 'none';
+            return;
+        }
+
+        wrapper.style.display = 'block';
+        container.innerHTML = '';
+        auditSelectedChannels.forEach(ch => {
+            const chip = document.createElement('span');
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 8px 4px 10px;background:var(--color-accent);color:#fff;border-radius:14px;font-size:12px;font-weight:500';
+            chip.innerHTML = `${API.escapeHtml(ch.title)}<button style="background:none;border:none;color:#fff;cursor:pointer;font-size:15px;line-height:1;padding:0 2px" title="Remove">&times;</button>`;
+            chip.querySelector('button').addEventListener('click', () => {
+                auditSelectedChannels = auditSelectedChannels.filter(c => c.id !== ch.id);
+                renderSelectedChips();
+            });
+            container.appendChild(chip);
+        });
+    }
+
+    // --- Saved channel lists ---
+
+    let savedChannelLists = [];
+
+    function loadSavedChannelLists() {
+        try {
+            const stored = localStorage.getItem('pa_saved_channel_lists');
+            savedChannelLists = stored ? JSON.parse(stored) : [];
+        } catch (e) { savedChannelLists = []; }
+    }
+
+    function persistSavedChannelLists() {
+        try {
+            localStorage.setItem('pa_saved_channel_lists', JSON.stringify(savedChannelLists));
+        } catch (e) {
+            API.toast('Failed to save to localStorage.', 'error');
+        }
+    }
+
+    function populateSavedListsDropdown() {
+        const sel = document.getElementById('audit-saved-lists');
+        sel.innerHTML = '<option value="">Load a saved list...</option>';
+        savedChannelLists.forEach((list, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = `${list.name} (${list.channels.length} ch)`;
+            sel.appendChild(opt);
+        });
+    }
+
+    function saveChannelList() {
+        if (auditSelectedChannels.length === 0) {
+            API.toast('Select channels first.', 'warning');
+            return;
+        }
+        const name = prompt('Enter a name for this channel list:');
+        if (!name || !name.trim()) return;
+
+        savedChannelLists.push({
+            name: name.trim(),
+            channels: auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }))
+        });
+        persistSavedChannelLists();
+        populateSavedListsDropdown();
+        API.toast('Channel list saved.', 'success');
+    }
+
+    function deleteChannelList() {
+        const sel = document.getElementById('audit-saved-lists');
+        const idx = parseInt(sel.value);
+        if (isNaN(idx)) { API.toast('Select a list to delete.', 'warning'); return; }
+        if (!confirm(`Delete "${savedChannelLists[idx].name}"?`)) return;
+
+        savedChannelLists.splice(idx, 1);
+        persistSavedChannelLists();
+        populateSavedListsDropdown();
+        API.toast('List deleted.', 'success');
+    }
+
+    function loadChannelList() {
+        const sel = document.getElementById('audit-saved-lists');
+        const idx = parseInt(sel.value);
+        if (isNaN(idx)) return;
+
+        auditSelectedChannels = [...savedChannelLists[idx].channels];
+        renderSelectedChips();
+        API.toast(`Loaded "${savedChannelLists[idx].name}".`, 'success');
+    }
+
+    // --- Audit execution ---
+
+    async function runAudit() {
+        if (auditInProgress) { API.toast('Audit already running.', 'warning'); return; }
+        if (auditSelectedChannels.length === 0) { API.toast('Select at least one channel.', 'warning'); return; }
+
+        const startDate = document.getElementById('audit-start').value;
+        if (!startDate) { API.toast('Select a start date.', 'warning'); return; }
+
+        const days = parseInt(document.getElementById('audit-days').value);
+        const dates = [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date(startDate);
+            d.setDate(d.getDate() + i);
+            dates.push(d.toISOString().slice(0, 10));
+        }
+
+        auditInProgress = true;
+        auditResults = [];
+
+        const progressDiv = document.getElementById('audit-progress');
+        const resultsDiv = document.getElementById('audit-results');
+        const totalTasks = auditSelectedChannels.length * dates.length;
+        let completedTasks = 0;
+
+        progressDiv.style.display = 'block';
+        resultsDiv.innerHTML = '';
+        progressDiv.innerHTML = `
+            <div class="card" style="margin-bottom:16px">
+                <div style="font-weight:600;margin-bottom:8px">Auditing ${auditSelectedChannels.length} channel(s) over ${days} day(s)...</div>
+                <div style="background:var(--color-border);height:8px;border-radius:4px;overflow:hidden">
+                    <div id="audit-progress-bar" style="background:var(--color-accent);height:100%;width:0%;transition:width 0.3s"></div>
+                </div>
+                <div id="audit-progress-text" style="margin-top:6px;font-size:13px;color:var(--color-text-secondary)">0 / ${totalTasks} tasks</div>
+            </div>
+        `;
+
+        for (const channel of auditSelectedChannels) {
+            const result = {
+                channelTitle: channel.title,
+                channelId: channel.id,
+                totalProgrammes: 0,
+                withImages: 0,
+                withoutImages: 0,
+                missingProgrammes: []
+            };
+
+            // Batch dates 5 at a time
+            for (let i = 0; i < dates.length; i += 5) {
+                const batch = dates.slice(i, i + 5);
+                const promises = batch.map(date => {
+                    const nextDay = new Date(date);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    return API.fetch('/schedule', {
+                        channelId: channel.id,
+                        start: `${date}T00:00:00`,
+                        end: `${nextDay.toISOString().slice(0, 10)}T00:00:00`
+                    }).then(data => ({ date, items: data.item || [] }))
+                      .catch(() => ({ date, items: [] }));
+                });
+
+                const batchResults = await Promise.all(promises);
+                batchResults.forEach(({ date, items }) => {
+                    items.forEach(item => {
+                        result.totalProgrammes++;
+                        if (getImages(item).length > 0) {
+                            result.withImages++;
+                        } else {
+                            result.withoutImages++;
+                            const asset = item.asset || {};
+                            const dt = item.dateTime ? new Date(item.dateTime) : null;
+                            result.missingProgrammes.push({
+                                title: item.title || 'Untitled',
+                                dateTime: dt ? dt.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
+                                assetId: asset.id || '-',
+                                date
+                            });
+                        }
+                    });
+                    completedTasks++;
+                    const pct = Math.round((completedTasks / totalTasks) * 100);
+                    const bar = document.getElementById('audit-progress-bar');
+                    const text = document.getElementById('audit-progress-text');
+                    if (bar) bar.style.width = `${pct}%`;
+                    if (text) text.textContent = `${completedTasks} / ${totalTasks} tasks (${pct}%)`;
+                });
+            }
+
+            auditResults.push(result);
+        }
+
+        auditInProgress = false;
+        progressDiv.style.display = 'none';
+        renderAuditResults();
+    }
+
+    // --- Audit results rendering ---
+
+    function renderAuditResults() {
+        const container = document.getElementById('audit-results');
+        container.innerHTML = '';
+
+        if (auditResults.length === 0) {
+            API.showEmpty(container, 'No audit results.');
+            return;
+        }
+
+        const totals = auditResults.reduce((acc, r) => ({
+            total: acc.total + r.totalProgrammes,
+            with: acc.with + r.withImages,
+            without: acc.without + r.withoutImages
+        }), { total: 0, with: 0, without: 0 });
+
+        const totalPct = totals.total > 0 ? Math.round((totals.with / totals.total) * 100) : 0;
+
+        // Header row with info + export button
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px';
+        header.innerHTML = `<div class="results-info" style="margin:0">
+            ${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, ${totals.with} with images (${totalPct}%), ${totals.without} missing
+        </div>`;
+
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'btn btn-sm btn-secondary';
+        exportBtn.textContent = 'Export to Excel';
+        exportBtn.addEventListener('click', exportAuditExcel);
+        header.appendChild(exportBtn);
+        container.appendChild(header);
+
+        // Results table
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Channel</th>
+                    <th style="text-align:right">Total</th>
+                    <th style="text-align:right">With Images</th>
+                    <th style="text-align:right">Missing</th>
+                    <th style="text-align:right">Coverage</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+
+        auditResults.forEach(result => {
+            const pct = result.totalProgrammes > 0 ? Math.round((result.withImages / result.totalProgrammes) * 100) : 0;
+            let color = 'var(--color-error)';
+            if (pct >= 90) color = 'var(--color-success)';
+            else if (pct >= 70) color = '#e67e00';
+
+            const row = document.createElement('tr');
+            row.className = 'clickable';
+            row.innerHTML = `
+                <td><strong>${API.escapeHtml(result.channelTitle)}</strong></td>
+                <td style="text-align:right">${result.totalProgrammes}</td>
+                <td style="text-align:right">${result.withImages}</td>
+                <td style="text-align:right">${result.withoutImages}</td>
+                <td style="text-align:right;font-weight:700;color:${color}">${pct}%</td>
+            `;
+
+            // Expandable drill-down row
+            const drillRow = document.createElement('tr');
+            drillRow.style.display = 'none';
+            const drillCell = document.createElement('td');
+            drillCell.colSpan = 5;
+            drillCell.style.cssText = 'padding:0;background:var(--color-bg)';
+            drillRow.appendChild(drillCell);
+
+            row.addEventListener('click', () => {
+                const isOpen = drillRow.style.display !== 'none';
+                drillRow.style.display = isOpen ? 'none' : '';
+                if (!isOpen && drillCell.children.length === 0) {
+                    renderAuditDrillDown(drillCell, result);
+                }
+            });
+
+            tbody.appendChild(row);
+            tbody.appendChild(drillRow);
+        });
+
+        // Totals row
+        const totalsRow = document.createElement('tr');
+        totalsRow.style.cssText = 'font-weight:700;border-top:2px solid var(--color-border)';
+        let totalColor = 'var(--color-error)';
+        if (totalPct >= 90) totalColor = 'var(--color-success)';
+        else if (totalPct >= 70) totalColor = '#e67e00';
+        totalsRow.innerHTML = `
+            <td>TOTAL</td>
+            <td style="text-align:right">${totals.total}</td>
+            <td style="text-align:right">${totals.with}</td>
+            <td style="text-align:right">${totals.without}</td>
+            <td style="text-align:right;color:${totalColor}">${totalPct}%</td>
+        `;
+        tbody.appendChild(totalsRow);
+
+        container.appendChild(table);
+    }
+
+    function renderAuditDrillDown(cell, result) {
+        if (result.missingProgrammes.length === 0) {
+            cell.innerHTML = '<div style="padding:16px;color:var(--color-success);font-weight:600">All programmes have images!</div>';
+            return;
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'padding:12px 16px;max-height:400px;overflow-y:auto';
+
+        const heading = document.createElement('div');
+        heading.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px';
+        heading.textContent = `Programmes Missing Images (${result.missingProgrammes.length})`;
+        wrapper.appendChild(heading);
+
+        const miniTable = document.createElement('table');
+        miniTable.className = 'data-table';
+        miniTable.style.fontSize = '13px';
+        miniTable.innerHTML = `<thead><tr><th>Programme</th><th>Date/Time</th><th>Asset ID</th></tr></thead><tbody></tbody>`;
+        const miniBody = miniTable.querySelector('tbody');
+
+        result.missingProgrammes.forEach(prog => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${API.escapeHtml(prog.title)}</td>
+                <td>${API.escapeHtml(prog.dateTime)}</td>
+                <td><code style="font-size:11px;user-select:all">${API.escapeHtml(prog.assetId)}</code></td>
+            `;
+            miniBody.appendChild(tr);
+        });
+
+        wrapper.appendChild(miniTable);
+        cell.appendChild(wrapper);
+    }
+
+    // --- Excel export ---
+
+    function exportAuditExcel() {
+        if (auditResults.length === 0) { API.toast('No results to export.', 'warning'); return; }
+
+        const wb = XLSX.utils.book_new();
+
+        // Summary sheet
+        const summaryRows = auditResults.map(r => {
+            const pct = r.totalProgrammes > 0 ? Math.round((r.withImages / r.totalProgrammes) * 100) : 0;
+            return {
+                'Channel': r.channelTitle,
+                'Total Programmes': r.totalProgrammes,
+                'With Images': r.withImages,
+                'Missing Images': r.withoutImages,
+                'Coverage %': pct
+            };
+        });
+
+        const totals = auditResults.reduce((a, r) => ({
+            total: a.total + r.totalProgrammes, with: a.with + r.withImages, without: a.without + r.withoutImages
+        }), { total: 0, with: 0, without: 0 });
+        const totalPct = totals.total > 0 ? Math.round((totals.with / totals.total) * 100) : 0;
+
+        summaryRows.push({
+            'Channel': 'TOTAL',
+            'Total Programmes': totals.total,
+            'With Images': totals.with,
+            'Missing Images': totals.without,
+            'Coverage %': totalPct
+        });
+
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Summary');
+
+        // Missing images sheet
+        const missingRows = [];
+        auditResults.forEach(r => {
+            r.missingProgrammes.forEach(p => {
+                missingRows.push({
+                    'Channel': r.channelTitle,
+                    'Programme': p.title,
+                    'Date/Time': p.dateTime,
+                    'Asset ID': p.assetId
+                });
+            });
+        });
+
+        if (missingRows.length > 0) {
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingRows), 'Missing Images');
+        }
+
+        const fileName = `Image_Audit_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        API.toast('Audit exported.', 'success');
+    }
+
     return { render };
 })();
+
