@@ -157,12 +157,27 @@ const ChannelsView = (() => {
             tr.innerHTML = `
                 <td><strong>${API.escapeHtml(ch.title)}</strong></td>
                 <td>${API.escapeHtml(ch.epg || '-')}</td>
-                <td><code style="font-size:12px;color:var(--color-accent);user-select:all">${API.escapeHtml(ch.id)}</code></td>
+                <td><code style="font-size:12px;color:var(--color-accent);user-select:all">${API.escapeHtml(ch.id)}</code> <button class="copy-id-btn" data-id="${API.escapeHtml(ch.id)}" style="background:none;border:1px solid var(--color-border);border-radius:3px;cursor:pointer;font-size:11px;padding:1px 5px;color:var(--color-text-secondary)" title="Copy ID">Copy</button></td>
                 <td>${API.escapeHtml(cats || '-')}</td>
                 <td>${attrs || '-'}</td>
             `;
-            tr.addEventListener('click', () => showChannelDetail(ch));
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('.copy-id-btn')) return;
+                showChannelDetail(ch);
+            });
             tbody.appendChild(tr);
+        });
+
+        // Copy ID button handler
+        table.addEventListener('click', (e) => {
+            const btn = e.target.closest('.copy-id-btn');
+            if (!btn) return;
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            navigator.clipboard.writeText(id).then(() => {
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+            });
         });
 
         if (rawData) {
@@ -203,7 +218,7 @@ const ChannelsView = (() => {
             <h3>${API.escapeHtml(ch.title)}</h3>
             <div class="detail-row">
                 <div class="detail-label">ID</div>
-                <div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(ch.id)}</code></div>
+                <div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(ch.id)}</code> <button onclick="navigator.clipboard.writeText('${API.escapeHtml(ch.id)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" style="background:none;border:1px solid var(--color-border);border-radius:3px;cursor:pointer;font-size:11px;padding:1px 5px;color:var(--color-text-secondary)">Copy</button></div>
             </div>
             ${ch.epg ? `<div class="detail-row"><div class="detail-label">EPG Number</div><div class="detail-value">${API.escapeHtml(ch.epg)}</div></div>` : ''}
             ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
