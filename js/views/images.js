@@ -144,7 +144,9 @@ const ImagesView = (() => {
         const dropdown = document.getElementById('img-channel-dropdown');
         const hiddenId = document.getElementById('img-channel-id');
 
-        input.addEventListener('focus', () => showDropdown());
+        input.addEventListener('focus', () => {
+            if (input.value.trim()) showDropdown();
+        });
         input.addEventListener('input', () => showDropdown());
 
         document.addEventListener('click', (e) => {
@@ -155,9 +157,19 @@ const ImagesView = (() => {
 
         function showDropdown() {
             const query = (input.value || '').toLowerCase().trim();
-            const filtered = query
-                ? allChannels.filter(ch => (ch.title || '').toLowerCase().includes(query))
-                : allChannels;
+
+            if (allChannels.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            if (!query) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = allChannels.filter(ch => (ch.title || '').toLowerCase().includes(query));
 
             if (filtered.length === 0) {
                 dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
