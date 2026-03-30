@@ -180,9 +180,43 @@ const ChannelsView = (() => {
             });
         });
 
+        // Download Excel button
+        const dlBtn = document.createElement('button');
+        dlBtn.className = 'btn btn-secondary';
+        dlBtn.style.marginTop = '12px';
+        dlBtn.textContent = 'Download Excel (TV / Radio)';
+        dlBtn.addEventListener('click', () => downloadChannelsExcel(items));
+        container.appendChild(dlBtn);
+
         if (rawData) {
             container.appendChild(API.jsonToggle(rawData));
         }
+    }
+
+    function downloadChannelsExcel(channels) {
+        const toRow = ch => ({
+            'Channel': ch.title || '',
+            'EPG': ch.epg || '',
+            'API ID': ch.id || '',
+            'Category': (ch.category || []).map(c => c.name).join(', '),
+            'Attributes': (ch.attribute || []).join(', ')
+        });
+
+        const radio = channels.filter(ch => (ch.attribute || []).includes('radio'));
+        const tv = channels.filter(ch => !(ch.attribute || []).includes('radio'));
+
+        const wb = XLSX.utils.book_new();
+        const tvSheet = XLSX.utils.json_to_sheet(tv.map(toRow));
+        const radioSheet = XLSX.utils.json_to_sheet(radio.map(toRow));
+
+        // Set column widths
+        const colWidths = [{ wch: 30 }, { wch: 8 }, { wch: 40 }, { wch: 20 }, { wch: 20 }];
+        tvSheet['!cols'] = colWidths;
+        radioSheet['!cols'] = colWidths;
+
+        XLSX.utils.book_append_sheet(wb, tvSheet, 'TV');
+        XLSX.utils.book_append_sheet(wb, radioSheet, 'Radio');
+        XLSX.writeFile(wb, 'Channels_TV_Radio.xlsx');
     }
 
     async function showChannelDetail(channel) {

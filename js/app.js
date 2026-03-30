@@ -4,10 +4,6 @@ const App = (() => {
         channels: ChannelsView,
         epg: EpgView,
         schedule: ScheduleView,
-        assets: AssetsView,
-        contributors: ContributorsView,
-        features: FeaturesView,
-        catalogues: CataloguesView,
         images: ImagesView
     };
 
