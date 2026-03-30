@@ -1,5 +1,6 @@
 const ContributorsView = (() => {
-    let lastResults = [];
+    let allContributors = [];
+    let loaded = false;
 
     async function render(container) {
         container.innerHTML = `
@@ -10,7 +11,7 @@ const ContributorsView = (() => {
             <div class="filter-bar">
                 <div class="form-group" style="flex:1;min-width:250px">
                     <label>Search by Name</label>
-                    <input type="text" id="cont-name-search" class="input" placeholder="Type a name and press Enter..." style="width:100%">
+                    <input type="text" id="cont-name-search" class="input" placeholder="Type to filter by name..." style="width:100%">
                 </div>
                 <div class="form-group">
                     <label>Or Look Up by ID</label>
@@ -21,61 +22,75 @@ const ContributorsView = (() => {
                     <button id="cont-search-id" class="btn btn-primary">Look Up</button>
                 </div>
             </div>
-            <div id="contributors-results">
-                <div class="empty-state"><p>Enter a name above to search for contributors.</p></div>
-            </div>
+            <div id="contributors-results"></div>
         `;
 
         document.getElementById('cont-search-id').addEventListener('click', lookupContributor);
         document.getElementById('cont-id').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') lookupContributor();
         });
+        document.getElementById('cont-name-search').addEventListener('input', filterByName);
 
-        let debounceTimer;
-        document.getElementById('cont-name-search').addEventListener('input', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(searchByName, 400);
-        });
-        document.getElementById('cont-name-search').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                clearTimeout(debounceTimer);
-                searchByName();
-            }
-        });
+        await loadAllContributors();
     }
 
-    async function searchByName() {
-        const query = (document.getElementById('cont-name-search').value || '').trim();
+    async function loadAllContributors() {
         const results = document.getElementById('contributors-results');
 
-        if (!query) {
-            results.innerHTML = '<div class="empty-state"><p>Enter a name above to search for contributors.</p></div>';
-            lastResults = [];
+        // If already loaded from a previous visit, just render
+        if (loaded && allContributors.length > 0) {
+            renderContributorList(results, allContributors);
             return;
         }
 
-        if (query.length < 2) return;
+        allContributors = [];
+        let offset = 0;
+        let hasMore = true;
 
-        API.showLoading(results);
-        try {
-            const data = await API.fetch('/contributor', { q: query });
-            lastResults = data.item || [];
-            renderContributorList(results, lastResults, data);
-        } catch (err) {
-            // Fallback: try without q param and filter client-side
+        results.innerHTML = '<div class="spinner">Loading contributors... 0 loaded</div>';
+
+        while (hasMore) {
             try {
-                const data = await API.fetch('/contributor');
-                const all = data.item || [];
-                lastResults = all.filter(c => {
-                    const name = (c.name || c.title || '').toLowerCase();
-                    return name.includes(query.toLowerCase());
-                });
-                renderContributorList(results, lastResults, data);
-            } catch (err2) {
-                lastResults = [];
-                API.showError(results, err2.message);
+                const params = { offset };
+                const data = await API.fetch('/contributor', params);
+                const items = data.item || [];
+                allContributors = allContributors.concat(items);
+                hasMore = data.hasNext === true && items.length > 0;
+                offset += items.length;
+
+                const spinner = results.querySelector('.spinner');
+                if (spinner) {
+                    spinner.textContent = `Loading contributors... ${allContributors.length} loaded${hasMore ? '' : ' (complete)'}`;
+                }
+            } catch (err) {
+                // If fetch fails, work with what we have
+                hasMore = false;
+                if (allContributors.length === 0) {
+                    API.showError(results, err.message);
+                    return;
+                }
             }
         }
+
+        loaded = true;
+        allContributors.sort((a, b) => (a.name || a.title || '').localeCompare(b.name || b.title || ''));
+        renderContributorList(results, allContributors);
+    }
+
+    function filterByName() {
+        const query = (document.getElementById('cont-name-search').value || '').toLowerCase().trim();
+        const results = document.getElementById('contributors-results');
+
+        if (!allContributors.length) return;
+
+        const filtered = query
+            ? allContributors.filter(c => {
+                const name = (c.name || c.title || '').toLowerCase();
+                return name.includes(query);
+            })
+            : allContributors;
+
+        renderContributorList(results, filtered);
     }
 
     async function lookupContributor() {
@@ -95,7 +110,7 @@ const ContributorsView = (() => {
         }
     }
 
-    function renderContributorList(container, items, rawData) {
+    function renderContributorList(container, items) {
         container.innerHTML = '';
         if (items.length === 0) {
             API.showEmpty(container, 'No contributors found matching your search.');
@@ -104,9 +119,7 @@ const ContributorsView = (() => {
 
         const info = document.createElement('div');
         info.className = 'results-info';
-        const total = rawData && rawData.total ? rawData.total : items.length;
-        const hasMore = rawData && rawData.hasNext;
-        info.textContent = `Showing ${items.length} contributor(s)${total > items.length ? ` of ${total}` : ''}${hasMore ? ' (more available)' : ''}`;
+        info.textContent = `Showing ${items.length} of ${allContributors.length} contributor(s)`;
         container.appendChild(info);
 
         const table = document.createElement('table');
@@ -123,7 +136,9 @@ const ContributorsView = (() => {
         container.appendChild(table);
 
         const tbody = table.querySelector('tbody');
-        items.forEach(cont => {
+        // Limit displayed rows for performance, show all when filtering
+        const display = items.length > 500 ? items.slice(0, 500) : items;
+        display.forEach(cont => {
             const tr = document.createElement('tr');
             tr.className = 'clickable';
             tr.innerHTML = `
@@ -134,8 +149,12 @@ const ContributorsView = (() => {
             tbody.appendChild(tr);
         });
 
-        if (rawData) {
-            container.appendChild(API.jsonToggle(rawData));
+        if (items.length > 500) {
+            const note = document.createElement('div');
+            note.className = 'results-info';
+            note.style.marginTop = '8px';
+            note.textContent = `Showing first 500 of ${items.length} — use the search box to narrow results.`;
+            container.appendChild(note);
         }
     }
 
