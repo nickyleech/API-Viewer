@@ -37,7 +37,7 @@ const ContributorsView = (() => {
         const results = document.getElementById('contributors-results');
         API.showLoading(results);
         try {
-            const data = await API.fetch('/contributor');
+            const data = await API.fetch('/contributor', { limit: 5000 });
             allContributors = data.item || [];
             renderContributorList(results, allContributors, data);
         } catch (err) {
@@ -88,7 +88,8 @@ const ContributorsView = (() => {
 
         const info = document.createElement('div');
         info.className = 'results-info';
-        info.textContent = `Showing ${items.length} of ${allContributors.length} contributor(s)`;
+        const hasMore = rawData && rawData.hasNext;
+        info.textContent = `Showing ${items.length} of ${allContributors.length} contributor(s)${hasMore ? ' (more available on server)' : ''}`;
         container.appendChild(info);
 
         const table = document.createElement('table');
