@@ -24,6 +24,7 @@ const ScheduleView = (() => {
                     <button id="sch-search" class="btn btn-primary">Load Schedule</button>
                 </div>
             </div>
+            <div id="schedule-day-nav" style="display:none"></div>
             <div id="schedule-results"></div>
         `;
 
@@ -123,9 +124,37 @@ const ScheduleView = (() => {
         try {
             const data = await API.fetch('/schedule', params);
             renderSchedule(results, data);
+            renderDayNav(date);
         } catch (err) {
+            document.getElementById('schedule-day-nav').style.display = 'none';
             API.showError(results, err.message);
         }
+    }
+
+    function renderDayNav(currentDate) {
+        const nav = document.getElementById('schedule-day-nav');
+        const dt = new Date(currentDate);
+        const dateStr = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+        nav.style.display = '';
+        nav.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+                <button id="sch-prev-day" class="btn btn-sm btn-secondary">&larr; Previous Day</button>
+                <span style="font-weight:600;font-size:15px;min-width:260px;text-align:center">${API.escapeHtml(dateStr)}</span>
+                <button id="sch-next-day" class="btn btn-sm btn-secondary">Next Day &rarr;</button>
+            </div>
+        `;
+
+        document.getElementById('sch-prev-day').addEventListener('click', () => shiftDay(-1));
+        document.getElementById('sch-next-day').addEventListener('click', () => shiftDay(1));
+    }
+
+    function shiftDay(offset) {
+        const dateInput = document.getElementById('sch-date');
+        const dt = new Date(dateInput.value);
+        dt.setDate(dt.getDate() + offset);
+        dateInput.value = dt.toISOString().slice(0, 10);
+        loadSchedule();
     }
 
     function renderSchedule(container, data) {

@@ -65,6 +65,7 @@ const ImagesView = (() => {
                         <button id="img-load" class="btn btn-primary">Load Programmes</button>
                     </div>
                 </div>
+                <div id="img-day-nav" style="display:none"></div>
                 <div id="img-filter-bar" style="display:none">
                     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
                         <span style="font-size:14px;font-weight:600;color:var(--color-text-secondary)">Show:</span>
@@ -258,12 +259,41 @@ const ImagesView = (() => {
             scheduleItems = data.item || [];
             updateCounts();
             document.getElementById('img-filter-bar').style.display = '';
+            renderImgDayNav();
             applyFilter('all');
         } catch (err) {
             scheduleItems = [];
             document.getElementById('img-filter-bar').style.display = 'none';
+            document.getElementById('img-day-nav').style.display = 'none';
             API.showError(results, err.message);
         }
+    }
+
+    function renderImgDayNav() {
+        const nav = document.getElementById('img-day-nav');
+        const startDate = document.getElementById('img-start').value;
+        const dt = new Date(startDate);
+        const dateStr = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+        nav.style.display = '';
+        nav.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+                <button id="img-prev-day" class="btn btn-sm btn-secondary">&larr; Previous Day</button>
+                <span style="font-weight:600;font-size:15px;min-width:260px;text-align:center">${API.escapeHtml(dateStr)}</span>
+                <button id="img-next-day" class="btn btn-sm btn-secondary">Next Day &rarr;</button>
+            </div>
+        `;
+
+        document.getElementById('img-prev-day').addEventListener('click', () => shiftImgDay(-1));
+        document.getElementById('img-next-day').addEventListener('click', () => shiftImgDay(1));
+    }
+
+    function shiftImgDay(offset) {
+        const dateInput = document.getElementById('img-start');
+        const dt = new Date(dateInput.value);
+        dt.setDate(dt.getDate() + offset);
+        dateInput.value = dt.toISOString().slice(0, 10);
+        loadProgrammes();
     }
 
     function getImages(item) {
