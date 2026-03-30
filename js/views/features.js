@@ -6,18 +6,18 @@ const FeaturesView = (() => {
         container.innerHTML = `
             <div class="view-header">
                 <h2>Features</h2>
-                <p>Browse curated feature collections by type and date.</p>
+                <p>Browse curated feature collections such as monthly streaming highlights. Select a feature type and date to see what's featured.</p>
             </div>
             <div class="filter-bar">
                 <div class="form-group">
                     <label>Feature Type</label>
-                    <select id="feat-type" class="select">
+                    <select id="feat-type" class="select" style="min-width:250px">
                         <option value="">Loading...</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Date</label>
-                    <input type="date" id="feat-date" class="input" style="min-width:150px" value="${today}">
+                    <input type="date" id="feat-date" class="input" style="min-width:160px" value="${today}">
                 </div>
                 <div class="form-group">
                     <label>&nbsp;</label>
@@ -27,8 +27,8 @@ const FeaturesView = (() => {
             <div id="features-results"></div>
         `;
 
-        await loadFeatureTypes();
         document.getElementById('feat-search').addEventListener('click', searchFeatures);
+        await loadFeatureTypes();
     }
 
     async function loadFeatureTypes() {
@@ -36,9 +36,9 @@ const FeaturesView = (() => {
         try {
             const data = await API.fetch('/feature-type');
             featureTypes = data.item || [];
-            sel.innerHTML = '<option value="">-- All Types --</option>';
+            sel.innerHTML = '<option value="">-- Select a Feature Type --</option>';
             featureTypes.forEach(ft => {
-                sel.innerHTML += `<option value="${API.escapeHtml(ft.id)}">${API.escapeHtml(ft.name)}</option>`;
+                sel.innerHTML += `<option value="${API.escapeHtml(ft.namespace)}">${API.escapeHtml(ft.name)}</option>`;
             });
         } catch (err) {
             sel.innerHTML = '<option value="">Error loading types</option>';
@@ -47,11 +47,15 @@ const FeaturesView = (() => {
 
     async function searchFeatures() {
         const results = document.getElementById('features-results');
-        const typeId = document.getElementById('feat-type').value;
+        const typeNamespace = document.getElementById('feat-type').value;
         const date = document.getElementById('feat-date').value;
 
-        const params = {};
-        if (typeId) params.featureTypeId = typeId;
+        if (!typeNamespace) {
+            API.toast('Please select a feature type.', 'warning');
+            return;
+        }
+
+        const params = { type: typeNamespace };
         if (date) params.date = date;
 
         API.showLoading(results);
@@ -65,37 +69,56 @@ const FeaturesView = (() => {
 
     function renderFeatures(container, data) {
         container.innerHTML = '';
-        const items = data.item || [];
-        if (items.length === 0) {
+
+        // The response may be a single feature or a collection
+        const features = data.item || (data.id ? [data] : []);
+
+        if (features.length === 0 && !data.selection) {
+            // Check if the response itself IS the feature (not wrapped in item[])
+            if (data.id) {
+                renderFeatureDetail(container, data);
+                return;
+            }
             API.showEmpty(container, 'No features found. Try a different type or date.');
+            return;
+        }
+
+        // If the response is a single feature object with selection
+        if (data.selection) {
+            renderFeatureDetail(container, data);
             return;
         }
 
         const info = document.createElement('div');
         info.className = 'results-info';
-        info.textContent = `${data.total || items.length} feature(s)`;
+        info.textContent = `${features.length} feature(s)`;
         container.appendChild(info);
 
-        items.forEach(feature => {
+        features.forEach(feature => {
             const card = document.createElement('div');
             card.className = 'card clickable';
 
-            const title = feature.title || feature.name || 'Untitled';
-            const type = feature.featureType ? feature.featureType.name : '';
+            const title = feature.title || feature.type || feature.name || 'Untitled';
+            const selectionCount = (feature.selection || feature.item || []).length;
+            const startDate = feature.start ? new Date(feature.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+            const endDate = feature.end ? new Date(feature.end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
             card.innerHTML = `
                 <div class="card-title">${API.escapeHtml(title)}</div>
-                ${type ? `<div class="card-meta"><span class="badge badge-purple">${API.escapeHtml(type)}</span></div>` : ''}
-                ${feature.summary ? `<p style="margin-top:6px;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(typeof feature.summary === 'string' ? feature.summary : feature.summary.short || '')}</p>` : ''}
+                <div class="card-meta">
+                    ${feature.type ? `<span class="badge badge-purple">${API.escapeHtml(feature.type)}</span>` : ''}
+                    ${selectionCount > 0 ? `<span class="badge badge-blue">${selectionCount} item(s)</span>` : ''}
+                    ${startDate ? `<span class="card-subtitle">${startDate}${endDate ? ` \u2014 ${endDate}` : ''}</span>` : ''}
+                </div>
             `;
-            card.addEventListener('click', () => showFeatureDetail(feature.id));
+            card.addEventListener('click', () => showFeatureDetail(feature));
             container.appendChild(card);
         });
 
         container.appendChild(API.jsonToggle(data));
     }
 
-    async function showFeatureDetail(featureId) {
+    function showFeatureDetail(feature) {
         const container = document.getElementById('content');
         container.innerHTML = '';
 
@@ -107,56 +130,95 @@ const FeaturesView = (() => {
 
         const panel = document.createElement('div');
         panel.className = 'detail-panel';
-        API.showLoading(panel);
         container.appendChild(panel);
 
-        try {
-            const feature = await API.fetch(`/feature/${featureId}`);
-            renderFeatureDetail(panel, feature);
-        } catch (err) {
-            API.showError(panel, err.message);
-        }
+        renderFeatureDetailContent(panel, feature);
     }
 
-    function renderFeatureDetail(panel, feature) {
-        const title = feature.title || feature.name || 'Untitled';
-        const summary = feature.summary || {};
+    function renderFeatureDetailContent(panel, feature) {
+        const title = feature.title || feature.type || feature.name || 'Untitled';
+        const startDate = feature.start ? new Date(feature.start).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+        const endDate = feature.end ? new Date(feature.end).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
         panel.innerHTML = `
             <h3>${API.escapeHtml(title)}</h3>
-            <div class="detail-row"><div class="detail-label">ID</div><div class="detail-value">${API.escapeHtml(feature.id || '')}</div></div>
+            ${feature.id ? `<div class="detail-row"><div class="detail-label">ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(feature.id)}</code></div></div>` : ''}
+            ${feature.type ? `<div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(feature.type)}</span></div></div>` : ''}
+            ${startDate ? `<div class="detail-row"><div class="detail-label">Start</div><div class="detail-value">${API.escapeHtml(startDate)}</div></div>` : ''}
+            ${endDate ? `<div class="detail-row"><div class="detail-label">End</div><div class="detail-value">${API.escapeHtml(endDate)}</div></div>` : ''}
         `;
 
-        if (feature.featureType) {
-            const row = document.createElement('div');
-            row.className = 'detail-row';
-            row.innerHTML = `<div class="detail-label">Type</div><div class="detail-value">${API.escapeHtml(feature.featureType.name || '')}</div>`;
-            panel.appendChild(row);
-        }
+        // Show selection items (the featured content)
+        const selection = feature.selection || feature.item || [];
 
-        const summaryText = typeof summary === 'string' ? summary : (summary.short || summary.medium || summary.long || '');
-        if (summaryText) {
-            const row = document.createElement('div');
-            row.className = 'detail-row';
-            row.innerHTML = `<div class="detail-label">Summary</div><div class="detail-value">${API.escapeHtml(summaryText)}</div>`;
-            panel.appendChild(row);
-        }
+        if (selection.length > 0) {
+            const selHeader = document.createElement('h3');
+            selHeader.style.cssText = 'margin:20px 0 12px;';
+            selHeader.textContent = `Featured Content (${selection.length})`;
+            panel.parentNode.insertBefore(selHeader, panel.nextSibling);
 
-        // Show assets in the feature
-        if (feature.item && feature.item.length > 0) {
-            const assetsHeader = document.createElement('h4');
-            assetsHeader.style.cssText = 'margin:16px 0 8px';
-            assetsHeader.textContent = `Assets (${feature.item.length})`;
-            panel.appendChild(assetsHeader);
+            const selContainer = document.createElement('div');
+            panel.parentNode.insertBefore(selContainer, selHeader.nextSibling);
 
-            feature.item.forEach(asset => {
-                const assetCard = document.createElement('div');
-                assetCard.className = 'card';
-                assetCard.innerHTML = `
-                    <div class="card-title">${API.escapeHtml(asset.title || 'Untitled')}</div>
-                    ${asset.type ? `<div class="card-meta"><span class="badge badge-blue">${API.escapeHtml(asset.type)}</span></div>` : ''}
+            selection.forEach(item => {
+                const asset = item.asset || item;
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                const assetTitle = asset.title || item.title || 'Untitled';
+                const summary = item.summary || asset.summary || {};
+                const shortDesc = typeof summary === 'string' ? summary : (summary.short || '');
+                const availDate = item.available ? new Date(item.available).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                const attrs = (item.attribute || asset.attribute || []);
+                const cats = (asset.category || []).map(c => c.name).join(', ');
+                const imgs = API.extractImages(asset.media || item.media);
+                const certification = asset.certification || item.certification || {};
+                const certEntries = Object.entries(certification).map(([k, v]) => `${k}: ${v}`).join(', ');
+
+                const typeColors = { movie: 'badge-orange', episode: 'badge-blue', series: 'badge-purple', season: 'badge-green' };
+                const typeBadge = asset.type ? `<span class="badge ${typeColors[asset.type] || 'badge-gray'}">${API.escapeHtml(asset.type)}</span>` : '';
+
+                card.innerHTML = `
+                    <div style="display:flex;gap:12px;align-items:start">
+                        ${imgs.length > 0 ? `<img src="${API.escapeHtml(imgs[0].href)}" class="thumb" alt="" style="width:100px;height:auto;border-radius:4px;">` : ''}
+                        <div style="flex:1">
+                            <div class="card-title">${API.escapeHtml(assetTitle)}</div>
+                            <div class="card-meta">
+                                ${typeBadge}
+                                ${asset.productionYear ? `<span class="badge badge-gray">${asset.productionYear}</span>` : ''}
+                                ${availDate ? `<span class="badge badge-green">Available: ${availDate}</span>` : ''}
+                                ${certEntries ? `<span class="badge badge-gray">${API.escapeHtml(certEntries)}</span>` : ''}
+                                ${imgs.length > 0 ? `<span class="badge badge-green">${imgs.length} image(s)</span>` : ''}
+                            </div>
+                            ${cats ? `<div style="margin-top:4px;font-size:12px;color:var(--color-text-secondary)">${API.escapeHtml(cats)}</div>` : ''}
+                            ${shortDesc ? `<p style="margin:6px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(shortDesc)}</p>` : ''}
+                            ${attrs.length > 0 ? `<div style="margin-top:6px">${attrs.map(a => `<span class="badge badge-gray" style="margin:2px">${API.escapeHtml(typeof a === 'string' ? a : a.name || '')}</span>`).join('')}</div>` : ''}
+                            ${asset.id ? `<div style="margin-top:4px"><code style="font-size:11px;color:var(--color-text-secondary);user-select:all">${API.escapeHtml(asset.id)}</code></div>` : ''}
+                        </div>
+                    </div>
                 `;
-                panel.appendChild(assetCard);
+
+                // Show more images if available
+                if (imgs.length > 1) {
+                    const imgRow = document.createElement('div');
+                    imgRow.style.cssText = 'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;';
+                    imgs.slice(1, 5).forEach(img => {
+                        const imgEl = document.createElement('img');
+                        imgEl.src = img.href;
+                        imgEl.alt = '';
+                        imgEl.style.cssText = 'max-width:160px;height:auto;border-radius:4px;border:1px solid var(--color-border);';
+                        imgRow.appendChild(imgEl);
+                    });
+                    if (imgs.length > 5) {
+                        const more = document.createElement('span');
+                        more.style.cssText = 'align-self:center;font-size:12px;color:var(--color-text-secondary)';
+                        more.textContent = `+${imgs.length - 5} more`;
+                        imgRow.appendChild(more);
+                    }
+                    card.appendChild(imgRow);
+                }
+
+                selContainer.appendChild(card);
             });
         }
 
