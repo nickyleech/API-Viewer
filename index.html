@@ -20,7 +20,8 @@
     <div class="app-layout">
         <nav class="sidebar">
             <ul class="nav-list">
-                <li><a href="#platforms" class="nav-link active" data-view="platforms">Platforms</a></li>
+                <li><a href="#images" class="nav-link active" data-view="images">Image Viewer</a></li>
+                <li><a href="#platforms" class="nav-link" data-view="platforms">Platforms</a></li>
                 <li><a href="#channels" class="nav-link" data-view="channels">Channels</a></li>
                 <li><a href="#epg" class="nav-link" data-view="epg">EPG Numbers</a></li>
                 <li><a href="#schedule" class="nav-link" data-view="schedule">Schedule</a></li>
@@ -28,7 +29,6 @@
                 <li><a href="#contributors" class="nav-link" data-view="contributors">Contributors</a></li>
                 <li><a href="#features" class="nav-link" data-view="features">Features</a></li>
                 <li><a href="#catalogues" class="nav-link" data-view="catalogues">Catalogues</a></li>
-                <li><a href="#images" class="nav-link" data-view="images">Image Viewer</a></li>
             </ul>
         </nav>
 
@@ -56,6 +56,7 @@
     <!-- Toast container -->
     <div id="toast-container" class="toast-container"></div>
 
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/views/platforms.js"></script>
     <script src="js/views/channels.js"></script>

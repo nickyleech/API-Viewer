@@ -25,7 +25,7 @@ const App = (() => {
         }
 
         // Navigate from hash or default to platforms
-        const hash = window.location.hash.slice(1) || 'platforms';
+        const hash = window.location.hash.slice(1) || 'images';
         navigateTo(hash);
     }
 

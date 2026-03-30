@@ -1,5 +1,5 @@
 const ContributorsView = (() => {
-    let allContributors = [];
+    let lastResults = [];
 
     async function render(container) {
         container.innerHTML = `
@@ -10,7 +10,7 @@ const ContributorsView = (() => {
             <div class="filter-bar">
                 <div class="form-group" style="flex:1;min-width:250px">
                     <label>Search by Name</label>
-                    <input type="text" id="cont-name-search" class="input" placeholder="Type to filter by name..." style="width:100%">
+                    <input type="text" id="cont-name-search" class="input" placeholder="Type a name and press Enter..." style="width:100%">
                 </div>
                 <div class="form-group">
                     <label>Or Look Up by ID</label>
@@ -21,45 +21,61 @@ const ContributorsView = (() => {
                     <button id="cont-search-id" class="btn btn-primary">Look Up</button>
                 </div>
             </div>
-            <div id="contributors-results"></div>
+            <div id="contributors-results">
+                <div class="empty-state"><p>Enter a name above to search for contributors.</p></div>
+            </div>
         `;
 
         document.getElementById('cont-search-id').addEventListener('click', lookupContributor);
         document.getElementById('cont-id').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') lookupContributor();
         });
-        document.getElementById('cont-name-search').addEventListener('input', filterContributors);
 
-        await loadAllContributors();
+        let debounceTimer;
+        document.getElementById('cont-name-search').addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(searchByName, 400);
+        });
+        document.getElementById('cont-name-search').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(debounceTimer);
+                searchByName();
+            }
+        });
     }
 
-    async function loadAllContributors() {
+    async function searchByName() {
+        const query = (document.getElementById('cont-name-search').value || '').trim();
         const results = document.getElementById('contributors-results');
+
+        if (!query) {
+            results.innerHTML = '<div class="empty-state"><p>Enter a name above to search for contributors.</p></div>';
+            lastResults = [];
+            return;
+        }
+
+        if (query.length < 2) return;
+
         API.showLoading(results);
         try {
-            const data = await API.fetch('/contributor', { limit: 5000 });
-            allContributors = data.item || [];
-            renderContributorList(results, allContributors, data);
+            const data = await API.fetch('/contributor', { q: query });
+            lastResults = data.item || [];
+            renderContributorList(results, lastResults, data);
         } catch (err) {
-            allContributors = [];
-            API.showError(results, err.message);
+            // Fallback: try without q param and filter client-side
+            try {
+                const data = await API.fetch('/contributor');
+                const all = data.item || [];
+                lastResults = all.filter(c => {
+                    const name = (c.name || c.title || '').toLowerCase();
+                    return name.includes(query.toLowerCase());
+                });
+                renderContributorList(results, lastResults, data);
+            } catch (err2) {
+                lastResults = [];
+                API.showError(results, err2.message);
+            }
         }
-    }
-
-    function filterContributors() {
-        const query = (document.getElementById('cont-name-search').value || '').toLowerCase().trim();
-        const results = document.getElementById('contributors-results');
-
-        if (!allContributors.length) return;
-
-        const filtered = query
-            ? allContributors.filter(c => {
-                const name = (c.name || c.title || '').toLowerCase();
-                return name.includes(query);
-            })
-            : allContributors;
-
-        renderContributorList(results, filtered, null);
     }
 
     async function lookupContributor() {
@@ -88,8 +104,9 @@ const ContributorsView = (() => {
 
         const info = document.createElement('div');
         info.className = 'results-info';
+        const total = rawData && rawData.total ? rawData.total : items.length;
         const hasMore = rawData && rawData.hasNext;
-        info.textContent = `Showing ${items.length} of ${allContributors.length} contributor(s)${hasMore ? ' (more available on server)' : ''}`;
+        info.textContent = `Showing ${items.length} contributor(s)${total > items.length ? ` of ${total}` : ''}${hasMore ? ' (more available)' : ''}`;
         container.appendChild(info);
 
         const table = document.createElement('table');
