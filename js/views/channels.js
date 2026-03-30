@@ -27,6 +27,10 @@ const ChannelsView = (() => {
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>Channel State Date</label>
+                    <input type="date" id="ch-date" class="input" style="min-width:160px" title="View channel names and attributes as they were/will be on this date">
+                </div>
+                <div class="form-group">
                     <label>&nbsp;</label>
                     <button id="ch-fetch" class="btn btn-primary">Load Channels</button>
                 </div>
@@ -83,10 +87,12 @@ const ChannelsView = (() => {
         const results = document.getElementById('channels-results');
         const platformId = document.getElementById('ch-platform').value;
         const regionId = document.getElementById('ch-region').value;
+        const date = document.getElementById('ch-date').value;
 
         const params = {};
         if (platformId) params.platformId = platformId;
         if (regionId) params.regionId = regionId;
+        if (date) params.date = date;
 
         API.showLoading(results);
         try {
@@ -130,6 +136,7 @@ const ChannelsView = (() => {
             <thead>
                 <tr>
                     <th>Channel</th>
+                    <th>EPG</th>
                     <th>API ID</th>
                     <th>Category</th>
                     <th>Attributes</th>
@@ -149,6 +156,7 @@ const ChannelsView = (() => {
             ).join(' ');
             tr.innerHTML = `
                 <td><strong>${API.escapeHtml(ch.title)}</strong></td>
+                <td>${API.escapeHtml(ch.epg || '-')}</td>
                 <td><code style="font-size:12px;color:var(--color-accent);user-select:all">${API.escapeHtml(ch.id)}</code></td>
                 <td>${API.escapeHtml(cats || '-')}</td>
                 <td>${attrs || '-'}</td>
@@ -189,13 +197,13 @@ const ChannelsView = (() => {
     function renderChannelDetail(panel, ch) {
         const cats = (ch.category || []).map(c => c.name).join(', ');
         const attrs = (ch.attribute || []).join(', ');
-        const subjects = (ch.subject || []).map(s => s.code).join(', ');
+        const subjects = (ch.subject || []).map(s => `${s.profile}: ${s.code}`).join(', ');
 
         panel.innerHTML = `
             <h3>${API.escapeHtml(ch.title)}</h3>
             <div class="detail-row">
                 <div class="detail-label">ID</div>
-                <div class="detail-value"><code style="user-select:all">${API.escapeHtml(ch.id)}</code></div>
+                <div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(ch.id)}</code></div>
             </div>
             ${ch.epg ? `<div class="detail-row"><div class="detail-label">EPG Number</div><div class="detail-value">${API.escapeHtml(ch.epg)}</div></div>` : ''}
             ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
@@ -203,11 +211,30 @@ const ChannelsView = (() => {
             ${subjects ? `<div class="detail-row"><div class="detail-label">Subject Codes</div><div class="detail-value">${API.escapeHtml(subjects)}</div></div>` : ''}
         `;
 
+        // Show meta fields (e.g. live-stream URLs)
+        const meta = ch.meta || {};
+        const metaEntries = Object.entries(meta).filter(([, v]) => v);
+        if (metaEntries.length > 0) {
+            metaEntries.forEach(([key, val]) => {
+                const row = document.createElement('div');
+                row.className = 'detail-row';
+                const isUrl = typeof val === 'string' && val.startsWith('http');
+                row.innerHTML = `
+                    <div class="detail-label">${API.escapeHtml(key)}</div>
+                    <div class="detail-value">${isUrl
+                        ? `<a href="${API.escapeHtml(val)}" target="_blank" rel="noopener" style="word-break:break-all">${API.escapeHtml(val)}</a>`
+                        : API.escapeHtml(String(val))
+                    }</div>
+                `;
+                panel.appendChild(row);
+            });
+        }
+
         // Show media/images if present
         const chImgs = API.extractImages(ch.media);
         if (chImgs.length > 0) {
             const mediaHtml = chImgs.map(img =>
-                `<img src="${API.escapeHtml(img.href)}" class="thumb" alt="Channel logo" style="width:120px;height:auto;margin:4px;">`
+                `<img src="${API.escapeHtml(img.href)}" alt="Channel logo" style="width:120px;height:auto;margin:4px;border-radius:4px;border:1px solid var(--color-border);">`
             ).join('');
             const mediaRow = document.createElement('div');
             mediaRow.className = 'detail-row';

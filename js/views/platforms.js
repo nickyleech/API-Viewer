@@ -5,7 +5,7 @@ const PlatformsView = (() => {
         container.innerHTML = `
             <div class="view-header">
                 <h2>Platforms</h2>
-                <p>Browse available TV platforms and their regions.</p>
+                <p>Browse available TV platforms and their regions. Click a platform to see its available regions.</p>
             </div>
             <div id="platforms-list"></div>
         `;
@@ -39,11 +39,13 @@ const PlatformsView = (() => {
         data.item.forEach(platform => {
             const card = document.createElement('div');
             card.className = 'card clickable';
-            const code = platform.subject && platform.subject[0] ? platform.subject[0].code : '';
+            const codes = (platform.subject || []).map(s => s.code).filter(Boolean);
             card.innerHTML = `
                 <div class="card-title">${API.escapeHtml(platform.title)}</div>
-                <div class="card-subtitle">${API.escapeHtml(platform.id)}</div>
-                ${code ? `<div class="card-meta"><span class="badge badge-blue">${API.escapeHtml(code)}</span></div>` : ''}
+                <div class="card-meta">
+                    <code style="font-size:12px;color:var(--color-text-secondary);user-select:all">${API.escapeHtml(platform.id)}</code>
+                    ${codes.map(c => `<span class="badge badge-blue">${API.escapeHtml(c)}</span>`).join('')}
+                </div>
             `;
             card.addEventListener('click', () => showPlatformDetail(platform));
             container.appendChild(card);
@@ -64,22 +66,20 @@ const PlatformsView = (() => {
 
         const panel = document.createElement('div');
         panel.className = 'detail-panel';
+
+        const subjects = platform.subject || [];
         panel.innerHTML = `
             <h3>${API.escapeHtml(platform.title)}</h3>
             <div class="detail-row">
                 <div class="detail-label">ID</div>
-                <div class="detail-value">${API.escapeHtml(platform.id)}</div>
+                <div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(platform.id)}</code></div>
             </div>
-            ${platform.subject ? platform.subject.map(s => `
+            ${subjects.map(s => `
                 <div class="detail-row">
-                    <div class="detail-label">Code</div>
-                    <div class="detail-value">${API.escapeHtml(s.code)}</div>
+                    <div class="detail-label">${API.escapeHtml(s.profile || 'Code')}</div>
+                    <div class="detail-value"><span class="badge badge-blue">${API.escapeHtml(s.code)}</span></div>
                 </div>
-                <div class="detail-row">
-                    <div class="detail-label">Profile</div>
-                    <div class="detail-value">${API.escapeHtml(s.profile || '')}</div>
-                </div>
-            `).join('') : ''}
+            `).join('')}
         `;
         panel.appendChild(API.jsonToggle(platform));
         container.appendChild(panel);
@@ -96,13 +96,13 @@ const PlatformsView = (() => {
         API.showLoading(regionsList);
         try {
             const data = await API.fetch(`/platform/${platform.id}/region`);
-            renderRegions(regionsList, data);
+            renderRegions(regionsList, data, platform);
         } catch (err) {
             API.showError(regionsList, err.message);
         }
     }
 
-    function renderRegions(container, data) {
+    function renderRegions(container, data, platform) {
         container.innerHTML = '';
         const items = data.item || data;
         if (!items || items.length === 0) {
@@ -115,14 +115,30 @@ const PlatformsView = (() => {
         info.textContent = `${data.total || items.length} region(s)`;
         container.appendChild(info);
 
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Region</th>
+                    <th>API ID</th>
+                    <th>Code</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        container.appendChild(table);
+
+        const tbody = table.querySelector('tbody');
         items.forEach(region => {
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.innerHTML = `
-                <div class="card-title">${API.escapeHtml(region.title || region.name || 'Unnamed')}</div>
-                <div class="card-subtitle">${API.escapeHtml(region.id)}</div>
+            const tr = document.createElement('tr');
+            const codes = (region.subject || []).map(s => s.code).filter(Boolean);
+            tr.innerHTML = `
+                <td><strong>${API.escapeHtml(region.title || region.name || 'Unnamed')}</strong></td>
+                <td><code style="font-size:12px;color:var(--color-accent);user-select:all">${API.escapeHtml(region.id)}</code></td>
+                <td>${codes.map(c => `<span class="badge badge-blue">${API.escapeHtml(c)}</span>`).join(' ') || '-'}</td>
             `;
-            container.appendChild(card);
+            tbody.appendChild(tr);
         });
 
         container.appendChild(API.jsonToggle(data));
