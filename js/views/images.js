@@ -199,31 +199,6 @@ const ImagesView = (() => {
         try {
             const data = await API.fetch('/schedule', params);
             scheduleItems = data.item || [];
-
-            // Fetch full asset details to get images
-            const total = scheduleItems.length;
-            let loaded = 0;
-            results.innerHTML = `<div class="spinner">Loading asset details... 0 / ${total}</div>`;
-
-            // Fetch in batches of 5 to avoid overwhelming the API
-            const batchSize = 5;
-            for (let i = 0; i < scheduleItems.length; i += batchSize) {
-                const batch = scheduleItems.slice(i, i + batchSize);
-                await Promise.all(batch.map(async (item) => {
-                    if (item.asset && item.asset.id) {
-                        try {
-                            const fullAsset = await API.fetch(`/asset/${item.asset.id}`);
-                            item.asset = fullAsset;
-                        } catch (e) {
-                            // Keep the partial asset data if fetch fails
-                        }
-                    }
-                    loaded++;
-                }));
-                const spinner = results.querySelector('.spinner');
-                if (spinner) spinner.textContent = `Loading asset details... ${loaded} / ${total}`;
-            }
-
             updateCounts();
             document.getElementById('img-filter-bar').style.display = '';
             applyFilter('all');
@@ -236,18 +211,15 @@ const ImagesView = (() => {
 
     function getImages(item) {
         const asset = item.asset || {};
-        const media = asset.media || item.media || [];
-        const mediaArr = Array.isArray(media) ? media : [media];
-        const images = [];
-        mediaArr.forEach(m => {
-            if (!m) return;
-            const renditions = m.rendition || [];
-            const rendArr = Array.isArray(renditions) ? renditions : [renditions];
-            rendArr.forEach(r => {
-                if (r && r.href) images.push(r);
-            });
+        // Collect images from asset.media and also from related items' media
+        const allMedia = [];
+        const assetMedia = asset.media || item.media || [];
+        (Array.isArray(assetMedia) ? assetMedia : [assetMedia]).forEach(m => { if (m) allMedia.push(m); });
+        // Also check related assets for images
+        (asset.related || []).forEach(rel => {
+            (Array.isArray(rel.media) ? rel.media : rel.media ? [rel.media] : []).forEach(m => { if (m) allMedia.push(m); });
         });
-        return images;
+        return API.extractImages(allMedia);
     }
 
     function updateCounts() {
@@ -402,8 +374,8 @@ const ImagesView = (() => {
                 const meta = document.createElement('div');
                 meta.className = 'img-gallery-meta';
                 const parts = [];
+                if (img.label) parts.push(img.label);
                 if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
-                if (img.type) parts.push(img.type);
                 meta.innerHTML = `
                     ${parts.length ? `<span>${API.escapeHtml(parts.join(' · '))}</span>` : ''}
                     <a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open in new tab</a>

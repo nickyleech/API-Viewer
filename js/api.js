@@ -100,6 +100,27 @@ const API = (() => {
         return d.innerHTML;
     }
 
+    // Extract rendition images from a media array
+    // Handles rendition as keyed object {"default":{...},"16x9":{...}} or array [{...}]
+    function extractImages(mediaArr) {
+        if (!mediaArr) return [];
+        const list = Array.isArray(mediaArr) ? mediaArr : [mediaArr];
+        const images = [];
+        list.forEach(m => {
+            if (!m || !m.rendition) return;
+            const rend = m.rendition;
+            if (Array.isArray(rend)) {
+                rend.forEach(r => { if (r && r.href) images.push(r); });
+            } else if (typeof rend === 'object') {
+                // Keyed object: { "default": {href,...}, "16x9": {href,...} }
+                Object.entries(rend).forEach(([key, r]) => {
+                    if (r && r.href) images.push({ ...r, label: key });
+                });
+            }
+        });
+        return images;
+    }
+
     // Toast notification
     function toast(message, type = 'error') {
         const container = document.getElementById('toast-container');
@@ -114,6 +135,6 @@ const API = (() => {
         getApiKey, setApiKey, removeApiKey, hasApiKey,
         fetch: apiFetch,
         jsonToggle, showLoading, showError, showEmpty,
-        escapeHtml, toast, ApiError
+        escapeHtml, toast, extractImages, ApiError
     };
 })();

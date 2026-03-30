@@ -219,16 +219,14 @@ const ScheduleView = (() => {
         `;
 
         // Show images from asset media
-        if (asset.media && asset.media.length > 0) {
-            const imgs = asset.media.flatMap(m => { const r = m.rendition || []; return (Array.isArray(r) ? r : [r]).filter(r => r && r.href); });
-            if (imgs.length > 0) {
-                const mediaRow = document.createElement('div');
-                mediaRow.className = 'detail-row';
-                mediaRow.innerHTML = `<div class="detail-label">Media</div><div class="detail-value">${
-                    imgs.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:240px;height:auto;margin:4px;border-radius:4px;" alt="">`).join('')
-                }</div>`;
-                panel.appendChild(mediaRow);
-            }
+        const imgs = API.extractImages(asset.media);
+        if (imgs.length > 0) {
+            const mediaRow = document.createElement('div');
+            mediaRow.className = 'detail-row';
+            mediaRow.innerHTML = `<div class="detail-label">Media</div><div class="detail-value">${
+                imgs.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:240px;height:auto;margin:4px;border-radius:4px;" alt="">`).join('')
+            }</div>`;
+            panel.appendChild(mediaRow);
         }
 
         // Show related assets (series, season links)

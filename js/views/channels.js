@@ -204,19 +204,15 @@ const ChannelsView = (() => {
         `;
 
         // Show media/images if present
-        if (ch.media && ch.media.length > 0) {
-            const mediaHtml = ch.media.map(m => {
-                const rend = m.rendition || [];
-                const renditions = Array.isArray(rend) ? rend : [rend];
-                const img = renditions.find(r => r && r.href) || {};
-                return img.href ? `<img src="${API.escapeHtml(img.href)}" class="thumb" alt="Channel logo" style="width:120px;height:auto;margin:4px;">` : '';
-            }).join('');
-            if (mediaHtml) {
-                const mediaRow = document.createElement('div');
-                mediaRow.className = 'detail-row';
-                mediaRow.innerHTML = `<div class="detail-label">Media</div><div class="detail-value">${mediaHtml}</div>`;
-                panel.appendChild(mediaRow);
-            }
+        const chImgs = API.extractImages(ch.media);
+        if (chImgs.length > 0) {
+            const mediaHtml = chImgs.map(img =>
+                `<img src="${API.escapeHtml(img.href)}" class="thumb" alt="Channel logo" style="width:120px;height:auto;margin:4px;">`
+            ).join('');
+            const mediaRow = document.createElement('div');
+            mediaRow.className = 'detail-row';
+            mediaRow.innerHTML = `<div class="detail-label">Media</div><div class="detail-value">${mediaHtml}</div>`;
+            panel.appendChild(mediaRow);
         }
 
         panel.appendChild(API.jsonToggle(ch));
