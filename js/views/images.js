@@ -1,6 +1,8 @@
 const ImagesView = (() => {
     let allChannels = [];
     let scheduleItems = [];
+    let savedListView = null;
+    let currentFilter = 'all';
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
@@ -230,6 +232,7 @@ const ImagesView = (() => {
     }
 
     function applyFilter(filter) {
+        currentFilter = filter;
         // Update button styles
         ['all', 'with', 'without'].forEach(f => {
             const btn = document.getElementById(`img-filter-${f}`);
@@ -314,14 +317,30 @@ const ImagesView = (() => {
         });
     }
 
+    function restoreListView() {
+        const container = document.getElementById('content');
+        if (savedListView) {
+            container.innerHTML = '';
+            container.appendChild(savedListView);
+            savedListView = null;
+        } else {
+            render(container);
+        }
+    }
+
     function showProgrammeDetail(item) {
         const container = document.getElementById('content');
-        container.innerHTML = '';
+
+        // Save current list view so we can restore it on back
+        savedListView = document.createDocumentFragment();
+        while (container.firstChild) {
+            savedListView.appendChild(container.firstChild);
+        }
 
         const back = document.createElement('a');
         back.className = 'back-link';
         back.innerHTML = '&larr; Back to Image Viewer';
-        back.addEventListener('click', () => render(container));
+        back.addEventListener('click', () => restoreListView());
         container.appendChild(back);
 
         const images = getImages(item);
