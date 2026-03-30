@@ -2,6 +2,7 @@ const App = (() => {
     const views = {
         platforms: PlatformsView,
         channels: ChannelsView,
+        epg: EpgView,
         schedule: ScheduleView,
         assets: AssetsView,
         contributors: ContributorsView,
