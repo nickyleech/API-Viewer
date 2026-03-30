@@ -199,6 +199,31 @@ const ImagesView = (() => {
         try {
             const data = await API.fetch('/schedule', params);
             scheduleItems = data.item || [];
+
+            // Fetch full asset details to get images
+            const total = scheduleItems.length;
+            let loaded = 0;
+            results.innerHTML = `<div class="spinner">Loading asset details... 0 / ${total}</div>`;
+
+            // Fetch in batches of 5 to avoid overwhelming the API
+            const batchSize = 5;
+            for (let i = 0; i < scheduleItems.length; i += batchSize) {
+                const batch = scheduleItems.slice(i, i + batchSize);
+                await Promise.all(batch.map(async (item) => {
+                    if (item.asset && item.asset.id) {
+                        try {
+                            const fullAsset = await API.fetch(`/asset/${item.asset.id}`);
+                            item.asset = fullAsset;
+                        } catch (e) {
+                            // Keep the partial asset data if fetch fails
+                        }
+                    }
+                    loaded++;
+                }));
+                const spinner = results.querySelector('.spinner');
+                if (spinner) spinner.textContent = `Loading asset details... ${loaded} / ${total}`;
+            }
+
             updateCounts();
             document.getElementById('img-filter-bar').style.display = '';
             applyFilter('all');
