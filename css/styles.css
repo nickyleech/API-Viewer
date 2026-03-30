@@ -632,6 +632,88 @@ body {
     text-align: center;
 }
 
+/* ===== View Tabs ===== */
+.view-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--color-border);
+}
+
+.view-tab {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color var(--transition), border-color var(--transition);
+}
+
+.view-tab:hover {
+    color: var(--color-text);
+}
+
+.view-tab.active {
+    color: var(--color-accent);
+    border-bottom-color: var(--color-accent);
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* ===== Season Accordion ===== */
+.season-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+}
+
+.season-header:hover {
+    background: var(--color-bg);
+    border-color: var(--color-accent);
+}
+
+.season-header h4 {
+    font-size: 15px;
+    margin: 0;
+}
+
+.season-toggle {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    transition: transform var(--transition);
+}
+
+.season-toggle.open {
+    transform: rotate(180deg);
+}
+
+.season-episodes {
+    display: none;
+    padding: 0 0 16px 20px;
+}
+
+.season-episodes.open {
+    display: block;
+}
+
 /* ===== Image Gallery ===== */
 .img-gallery {
     display: grid;

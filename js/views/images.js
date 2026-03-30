@@ -1,68 +1,112 @@
 const ImagesView = (() => {
+    // === Schedule tab state ===
     let allChannels = [];
     let scheduleItems = [];
     let savedListView = null;
     let currentFilter = 'all';
+
+    // === Programme tab state ===
+    let catalogues = [];
+    let programmeResults = [];
+    let savedProgrammeView = null;
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
         container.innerHTML = `
             <div class="view-header">
                 <h2>Image Viewer</h2>
-                <p>Browse programme images for a channel. View which programmes have images and which are missing them.</p>
+                <p>Browse programme images by schedule or search for a programme by name.</p>
             </div>
-            <div class="filter-bar">
-                <div class="form-group" style="flex:1;min-width:250px">
-                    <label>Channel</label>
-                    <input type="text" id="img-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
-                    <div id="img-channel-dropdown" class="channel-dropdown"></div>
-                    <input type="hidden" id="img-channel-id">
-                </div>
-                <div class="form-group">
-                    <label>Start Date</label>
-                    <input type="date" id="img-start" class="input" style="min-width:160px" value="${today}">
-                </div>
-                <div class="form-group">
-                    <label>Date Range</label>
-                    <div style="display:flex;gap:8px;align-items:center">
-                        <select id="img-range-type" class="select" style="min-width:120px">
-                            <option value="days">Number of days</option>
-                            <option value="end">End date</option>
+            <div class="view-tabs">
+                <button class="view-tab active" data-tab="schedule">By Schedule</button>
+                <button class="view-tab" data-tab="programme">By Programme</button>
+            </div>
+
+            <div id="tab-schedule" class="tab-panel active">
+                <div class="filter-bar">
+                    <div class="form-group" style="flex:1;min-width:250px">
+                        <label>Channel</label>
+                        <input type="text" id="img-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
+                        <div id="img-channel-dropdown" class="channel-dropdown"></div>
+                        <input type="hidden" id="img-channel-id">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="img-start" class="input" style="min-width:160px" value="${today}">
+                    </div>
+                    <div class="form-group">
+                        <label>Date Range</label>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <select id="img-range-type" class="select" style="min-width:120px">
+                                <option value="days">Number of days</option>
+                                <option value="end">End date</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" id="img-days-group">
+                        <label>Days</label>
+                        <select id="img-days" class="select" style="min-width:80px">
+                            <option value="1" selected>1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="7">7</option>
+                            <option value="14">14</option>
+                            <option value="21">21</option>
                         </select>
                     </div>
+                    <div class="form-group" id="img-end-group" style="display:none">
+                        <label>End Date</label>
+                        <input type="date" id="img-end" class="input" style="min-width:160px">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="img-load" class="btn btn-primary">Load Programmes</button>
+                    </div>
                 </div>
-                <div class="form-group" id="img-days-group">
-                    <label>Days</label>
-                    <select id="img-days" class="select" style="min-width:80px">
-                        <option value="1" selected>1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="5">5</option>
-                        <option value="7">7</option>
-                        <option value="14">14</option>
-                        <option value="21">21</option>
-                    </select>
+                <div id="img-filter-bar" style="display:none">
+                    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+                        <span style="font-size:14px;font-weight:600;color:var(--color-text-secondary)">Show:</span>
+                        <button id="img-filter-all" class="btn btn-sm btn-primary">All Programmes</button>
+                        <button id="img-filter-with" class="btn btn-sm btn-secondary">With Images <span id="img-count-with" class="badge badge-green" style="margin-left:4px">0</span></button>
+                        <button id="img-filter-without" class="btn btn-sm btn-secondary">Without Images <span id="img-count-without" class="badge badge-orange" style="margin-left:4px">0</span></button>
+                    </div>
                 </div>
-                <div class="form-group" id="img-end-group" style="display:none">
-                    <label>End Date</label>
-                    <input type="date" id="img-end" class="input" style="min-width:160px">
-                </div>
-                <div class="form-group">
-                    <label>&nbsp;</label>
-                    <button id="img-load" class="btn btn-primary">Load Programmes</button>
-                </div>
+                <div id="img-results"></div>
             </div>
-            <div id="img-filter-bar" style="display:none">
-                <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-                    <span style="font-size:14px;font-weight:600;color:var(--color-text-secondary)">Show:</span>
-                    <button id="img-filter-all" class="btn btn-sm btn-primary">All Programmes</button>
-                    <button id="img-filter-with" class="btn btn-sm btn-secondary">With Images <span id="img-count-with" class="badge badge-green" style="margin-left:4px">0</span></button>
-                    <button id="img-filter-without" class="btn btn-sm btn-secondary">Without Images <span id="img-count-without" class="badge badge-orange" style="margin-left:4px">0</span></button>
+
+            <div id="tab-programme" class="tab-panel">
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label>Catalogue</label>
+                        <select id="prog-catalogue" class="select" style="min-width:200px">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;min-width:250px">
+                        <label>Programme Name</label>
+                        <input type="text" id="prog-title" class="input" placeholder="e.g. Coronation Street, Peppa Pig..." style="width:100%">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="prog-search" class="btn btn-primary">Search</button>
+                    </div>
                 </div>
+                <div id="prog-results"></div>
             </div>
-            <div id="img-results"></div>
         `;
 
+        // Tab switching
+        container.querySelectorAll('.view-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                container.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+                container.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        // Schedule tab setup
         setupChannelSearch();
         setupRangeToggle();
         document.getElementById('img-load').addEventListener('click', loadProgrammes);
@@ -70,8 +114,19 @@ const ImagesView = (() => {
         document.getElementById('img-filter-with').addEventListener('click', () => applyFilter('with'));
         document.getElementById('img-filter-without').addEventListener('click', () => applyFilter('without'));
 
-        await loadAllChannels();
+        // Programme tab setup
+        document.getElementById('prog-search').addEventListener('click', searchProgrammes);
+        document.getElementById('prog-title').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') searchProgrammes();
+        });
+
+        // Load data for both tabs in parallel
+        await Promise.all([loadAllChannels(), loadCatalogues()]);
     }
+
+    // ============================================================
+    // SCHEDULE TAB — existing functionality
+    // ============================================================
 
     async function loadAllChannels() {
         try {
@@ -124,7 +179,7 @@ const ImagesView = (() => {
             if (filtered.length > 50) {
                 const more = document.createElement('div');
                 more.className = 'dropdown-empty';
-                more.textContent = `${filtered.length - 50} more — keep typing to narrow results`;
+                more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
                 dropdown.appendChild(more);
             }
 
@@ -165,7 +220,6 @@ const ImagesView = (() => {
             if (!end) return null;
         }
 
-        // Validate max 21 days
         const diffDays = (new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24);
         if (diffDays > 21) {
             API.toast('Date range cannot exceed 21 days.', 'warning');
@@ -213,11 +267,9 @@ const ImagesView = (() => {
 
     function getImages(item) {
         const asset = item.asset || {};
-        // Collect images from asset.media and also from related items' media
         const allMedia = [];
         const assetMedia = asset.media || item.media || [];
         (Array.isArray(assetMedia) ? assetMedia : [assetMedia]).forEach(m => { if (m) allMedia.push(m); });
-        // Also check related assets for images
         (asset.related || []).forEach(rel => {
             (Array.isArray(rel.media) ? rel.media : rel.media ? [rel.media] : []).forEach(m => { if (m) allMedia.push(m); });
         });
@@ -233,7 +285,6 @@ const ImagesView = (() => {
 
     function applyFilter(filter) {
         currentFilter = filter;
-        // Update button styles
         ['all', 'with', 'without'].forEach(f => {
             const btn = document.getElementById(`img-filter-${f}`);
             btn.className = `btn btn-sm ${f === filter ? 'btn-primary' : 'btn-secondary'}`;
@@ -331,7 +382,6 @@ const ImagesView = (() => {
     function showProgrammeDetail(item) {
         const container = document.getElementById('content');
 
-        // Save current list view so we can restore it on back
         savedListView = document.createDocumentFragment();
         while (container.firstChild) {
             savedListView.appendChild(container.firstChild);
@@ -368,7 +418,436 @@ const ImagesView = (() => {
         `;
         container.appendChild(panel);
 
-        // Image gallery
+        renderImageGallery(container, images, item.title);
+
+        const jsonSection = document.createElement('div');
+        jsonSection.style.marginTop = '16px';
+        jsonSection.appendChild(API.jsonToggle(item));
+        container.appendChild(jsonSection);
+    }
+
+    // ============================================================
+    // PROGRAMME TAB — new functionality
+    // ============================================================
+
+    async function loadCatalogues() {
+        const sel = document.getElementById('prog-catalogue');
+        try {
+            const data = await API.fetch('/catalogue');
+            catalogues = data.item || data.items || [];
+            sel.innerHTML = '';
+            catalogues.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.name || cat.title || cat.id;
+                sel.appendChild(opt);
+            });
+            if (catalogues.length === 0) {
+                sel.innerHTML = '<option value="">No catalogues available</option>';
+            }
+        } catch (err) {
+            sel.innerHTML = '<option value="">Error loading catalogues</option>';
+        }
+    }
+
+    async function searchProgrammes() {
+        const results = document.getElementById('prog-results');
+        const catalogueId = document.getElementById('prog-catalogue').value;
+        const title = document.getElementById('prog-title').value.trim();
+
+        if (!catalogueId) {
+            API.toast('Please select a catalogue.', 'warning');
+            return;
+        }
+        if (!title) {
+            API.toast('Please enter a programme name.', 'warning');
+            return;
+        }
+
+        API.showLoading(results);
+        try {
+            const data = await API.fetch(`/catalogue/${catalogueId}/asset`, { title, limit: 50 });
+            programmeResults = data.item || [];
+            renderProgrammeResults(results, programmeResults);
+        } catch (err) {
+            programmeResults = [];
+            API.showError(results, err.message);
+        }
+    }
+
+    function renderProgrammeResults(container, items) {
+        container.innerHTML = '';
+
+        if (items.length === 0) {
+            API.showEmpty(container, 'No programmes found matching your search.');
+            return;
+        }
+
+        // Group by type
+        const series = items.filter(a => a.type === 'series');
+        const movies = items.filter(a => a.type === 'movie');
+        const others = items.filter(a => a.type !== 'series' && a.type !== 'movie');
+
+        const info = document.createElement('div');
+        info.className = 'results-info';
+        info.textContent = `${items.length} result(s)`;
+        container.appendChild(info);
+
+        const allGroups = [];
+        if (series.length > 0) allGroups.push({ label: 'Series', items: series });
+        if (movies.length > 0) allGroups.push({ label: 'Movies', items: movies });
+        if (others.length > 0) allGroups.push({ label: 'Other', items: others });
+
+        allGroups.forEach(group => {
+            const heading = document.createElement('h3');
+            heading.style.cssText = 'margin:16px 0 8px;font-size:16px;';
+            heading.textContent = `${group.label} (${group.items.length})`;
+            container.appendChild(heading);
+
+            group.items.forEach(asset => {
+                const card = document.createElement('div');
+                card.className = 'card clickable';
+
+                const typeColors = { movie: 'badge-orange', episode: 'badge-blue', series: 'badge-purple', season: 'badge-green' };
+                const typeBadge = `<span class="badge ${typeColors[asset.type] || 'badge-gray'}">${API.escapeHtml(asset.type || 'unknown')}</span>`;
+                const cats = (asset.category || []).map(c => c.name).join(', ');
+                const summary = asset.summary || {};
+                const imgs = API.extractImages(asset.media);
+
+                card.innerHTML = `
+                    <div style="display:flex;gap:12px;align-items:start">
+                        ${imgs.length > 0 ? `<img src="${API.escapeHtml(imgs[0].href)}" class="thumb" alt="">` : ''}
+                        <div style="flex:1">
+                            <div class="card-title">${API.escapeHtml(asset.title || 'Untitled')}</div>
+                            <div class="card-meta">
+                                ${typeBadge}
+                                ${asset.productionYear ? `<span class="badge badge-gray">${asset.productionYear}</span>` : ''}
+                                ${imgs.length > 0 ? `<span class="badge badge-green">${imgs.length} image(s)</span>` : ''}
+                                ${cats ? `<span class="card-subtitle">${API.escapeHtml(cats)}</span>` : ''}
+                            </div>
+                            ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                if (asset.type === 'series') {
+                    card.addEventListener('click', () => showSeriesDetail(asset));
+                } else {
+                    card.addEventListener('click', () => showAssetImageDetail(asset));
+                }
+                container.appendChild(card);
+            });
+        });
+    }
+
+    function restoreProgrammeView() {
+        const container = document.getElementById('content');
+        if (savedProgrammeView) {
+            container.innerHTML = '';
+            container.appendChild(savedProgrammeView);
+            savedProgrammeView = null;
+        } else {
+            render(container);
+        }
+    }
+
+    async function showSeriesDetail(seriesAsset) {
+        const container = document.getElementById('content');
+
+        // Save current view
+        savedProgrammeView = document.createDocumentFragment();
+        while (container.firstChild) {
+            savedProgrammeView.appendChild(container.firstChild);
+        }
+
+        const back = document.createElement('a');
+        back.className = 'back-link';
+        back.innerHTML = '&larr; Back to Search Results';
+        back.addEventListener('click', () => restoreProgrammeView());
+        container.appendChild(back);
+
+        // Series header
+        const panel = document.createElement('div');
+        panel.className = 'detail-panel';
+        container.appendChild(panel);
+
+        API.showLoading(panel);
+
+        try {
+            // Fetch full series detail
+            const series = await API.fetch(`/asset/${seriesAsset.id}`);
+            const summary = series.summary || {};
+            const cats = (series.category || []).map(c => c.name).join(', ');
+            const seriesImgs = API.extractImages(series.media);
+
+            panel.innerHTML = `
+                <h3>${API.escapeHtml(series.title || 'Untitled')}</h3>
+                <div class="detail-row"><div class="detail-label">ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(series.id)}</code></div></div>
+                <div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(series.type || '')}</span></div></div>
+                ${series.productionYear ? `<div class="detail-row"><div class="detail-label">Year</div><div class="detail-value">${series.productionYear}</div></div>` : ''}
+                ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
+                ${summary.short ? `<div class="detail-row"><div class="detail-label">Summary</div><div class="detail-value">${API.escapeHtml(summary.short)}</div></div>` : ''}
+                ${summary.medium ? `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">${API.escapeHtml(summary.medium)}</div></div>` : ''}
+            `;
+
+            // Series images
+            if (seriesImgs.length > 0) {
+                const mediaRow = document.createElement('div');
+                mediaRow.className = 'detail-row';
+                mediaRow.innerHTML = `<div class="detail-label">Series Images</div><div class="detail-value">${
+                    seriesImgs.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:200px;height:auto;margin:4px;border-radius:4px;cursor:pointer" alt="">`).join('')
+                }</div>`;
+                mediaRow.querySelectorAll('img').forEach((img, i) => {
+                    img.addEventListener('click', () => openLightbox(seriesImgs[i].href, series.title));
+                });
+                panel.appendChild(mediaRow);
+            }
+
+            panel.appendChild(API.jsonToggle(series));
+
+            // Find related seasons
+            const relatedSeasons = (series.related || []).filter(r => r.type === 'season');
+
+            if (relatedSeasons.length === 0) {
+                const noSeasons = document.createElement('div');
+                noSeasons.className = 'detail-panel';
+                noSeasons.style.marginTop = '16px';
+                noSeasons.innerHTML = '<p style="color:var(--color-text-secondary)">No seasons found for this series.</p>';
+                container.appendChild(noSeasons);
+                return;
+            }
+
+            // Progress indicator
+            const progress = document.createElement('div');
+            progress.className = 'results-info';
+            progress.textContent = `Loading ${relatedSeasons.length} season(s)...`;
+            container.appendChild(progress);
+
+            // Fetch seasons in batches of 5
+            const seasons = [];
+            for (let i = 0; i < relatedSeasons.length; i += 5) {
+                const batch = relatedSeasons.slice(i, i + 5);
+                const batchResults = await Promise.all(
+                    batch.map(r => API.fetch(`/asset/${r.id}`).catch(() => null))
+                );
+                batchResults.forEach(s => { if (s) seasons.push(s); });
+                progress.textContent = `Loaded ${Math.min(i + 5, relatedSeasons.length)} of ${relatedSeasons.length} season(s)...`;
+            }
+
+            // Sort seasons by title (Season 1, Season 2, etc.)
+            seasons.sort((a, b) => {
+                const numA = parseInt((a.title || '').match(/\d+/)?.[0]) || 0;
+                const numB = parseInt((b.title || '').match(/\d+/)?.[0]) || 0;
+                return numA - numB;
+            });
+
+            progress.textContent = `${seasons.length} season(s)`;
+
+            // Render season accordions
+            const seasonsContainer = document.createElement('div');
+            seasonsContainer.style.marginTop = '8px';
+            container.appendChild(seasonsContainer);
+
+            seasons.forEach(season => {
+                const seasonImgs = API.extractImages(season.media);
+                const relatedEpisodes = (season.related || []).filter(r => r.type === 'episode');
+
+                const wrapper = document.createElement('div');
+                wrapper.style.marginBottom = '4px';
+
+                const header = document.createElement('div');
+                header.className = 'season-header';
+                header.innerHTML = `
+                    <h4>
+                        ${API.escapeHtml(season.title || 'Unnamed Season')}
+                        ${seasonImgs.length > 0 ? `<span class="badge badge-green" style="margin-left:8px">${seasonImgs.length} img</span>` : ''}
+                        <span class="badge badge-gray" style="margin-left:4px">${relatedEpisodes.length} episode(s)</span>
+                    </h4>
+                    <span class="season-toggle">\u25BC</span>
+                `;
+
+                const episodesPanel = document.createElement('div');
+                episodesPanel.className = 'season-episodes';
+
+                let episodesLoaded = false;
+
+                header.addEventListener('click', async () => {
+                    const isOpen = episodesPanel.classList.contains('open');
+                    episodesPanel.classList.toggle('open');
+                    header.querySelector('.season-toggle').classList.toggle('open');
+
+                    if (!isOpen && !episodesLoaded) {
+                        episodesLoaded = true;
+                        await loadSeasonEpisodes(episodesPanel, season, seasonImgs, relatedEpisodes);
+                    }
+                });
+
+                wrapper.appendChild(header);
+                wrapper.appendChild(episodesPanel);
+                seasonsContainer.appendChild(wrapper);
+            });
+
+        } catch (err) {
+            API.showError(panel, err.message);
+        }
+    }
+
+    async function loadSeasonEpisodes(container, season, seasonImgs, relatedEpisodes) {
+        API.showLoading(container);
+
+        // Show season images first
+        if (seasonImgs.length > 0) {
+            const seasonImgSection = document.createElement('div');
+            seasonImgSection.style.cssText = 'margin:12px 0 16px;';
+            seasonImgSection.innerHTML = `<h4 style="margin:0 0 8px;font-size:14px;">Season Images (${seasonImgs.length})</h4>`;
+            const gallery = document.createElement('div');
+            gallery.className = 'img-gallery';
+            seasonImgs.forEach(img => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'img-gallery-item';
+                const imgEl = document.createElement('img');
+                imgEl.src = img.href;
+                imgEl.alt = season.title || '';
+                imgEl.className = 'img-gallery-img';
+                imgEl.addEventListener('click', () => openLightbox(img.href, season.title));
+                wrapper.appendChild(imgEl);
+                const meta = document.createElement('div');
+                meta.className = 'img-gallery-meta';
+                const parts = [];
+                if (img.label) parts.push(img.label);
+                if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
+                meta.innerHTML = `${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}<a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open</a>`;
+                wrapper.appendChild(meta);
+                gallery.appendChild(wrapper);
+            });
+            seasonImgSection.appendChild(gallery);
+            container.innerHTML = '';
+            container.appendChild(seasonImgSection);
+        } else {
+            container.innerHTML = '';
+        }
+
+        if (relatedEpisodes.length === 0) {
+            const noEp = document.createElement('p');
+            noEp.style.cssText = 'color:var(--color-text-secondary);margin:8px 0;';
+            noEp.textContent = 'No episodes found for this season.';
+            container.appendChild(noEp);
+            return;
+        }
+
+        const epProgress = document.createElement('div');
+        epProgress.className = 'results-info';
+        epProgress.textContent = `Loading ${relatedEpisodes.length} episode(s)...`;
+        container.appendChild(epProgress);
+
+        // Fetch episodes in batches of 5
+        const episodes = [];
+        for (let i = 0; i < relatedEpisodes.length; i += 5) {
+            const batch = relatedEpisodes.slice(i, i + 5);
+            const batchResults = await Promise.all(
+                batch.map(r => API.fetch(`/asset/${r.id}`).catch(() => null))
+            );
+            batchResults.forEach(ep => { if (ep) episodes.push(ep); });
+            epProgress.textContent = `Loaded ${Math.min(i + 5, relatedEpisodes.length)} of ${relatedEpisodes.length} episode(s)...`;
+        }
+
+        // Sort episodes by episode number or title
+        episodes.sort((a, b) => {
+            const numA = parseInt((a.title || '').match(/\d+/)?.[0]) || 0;
+            const numB = parseInt((b.title || '').match(/\d+/)?.[0]) || 0;
+            return numA - numB;
+        });
+
+        epProgress.textContent = `${episodes.length} episode(s)`;
+
+        // Render episode cards
+        episodes.forEach(ep => {
+            const epImgs = API.extractImages(ep.media);
+            const summary = ep.summary || {};
+
+            const card = document.createElement('div');
+            card.className = 'card clickable';
+            card.style.marginBottom = '8px';
+
+            card.innerHTML = `
+                <div style="display:flex;gap:12px;align-items:start">
+                    ${epImgs.length > 0 ? `<img src="${API.escapeHtml(epImgs[0].href)}" class="thumb" alt="">` : ''}
+                    <div style="flex:1">
+                        <div class="card-title">${API.escapeHtml(ep.title || 'Untitled')}</div>
+                        <div class="card-meta">
+                            <span class="badge badge-blue">episode</span>
+                            ${ep.productionYear ? `<span class="badge badge-gray">${ep.productionYear}</span>` : ''}
+                            ${epImgs.length > 0 ? `<span class="badge badge-green">${epImgs.length} image(s)</span>` : '<span class="badge badge-orange">No images</span>'}
+                        </div>
+                        ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
+                    </div>
+                </div>
+            `;
+
+            card.addEventListener('click', () => showAssetImageDetail(ep));
+            container.appendChild(card);
+        });
+    }
+
+    async function showAssetImageDetail(asset) {
+        const container = document.getElementById('content');
+
+        // Save current view
+        if (!savedProgrammeView) {
+            savedProgrammeView = document.createDocumentFragment();
+            while (container.firstChild) {
+                savedProgrammeView.appendChild(container.firstChild);
+            }
+        }
+
+        container.innerHTML = '';
+
+        const back = document.createElement('a');
+        back.className = 'back-link';
+        back.innerHTML = '&larr; Back';
+        back.addEventListener('click', () => restoreProgrammeView());
+        container.appendChild(back);
+
+        const panel = document.createElement('div');
+        panel.className = 'detail-panel';
+        API.showLoading(panel);
+        container.appendChild(panel);
+
+        try {
+            // Fetch full asset detail
+            const fullAsset = await API.fetch(`/asset/${asset.id}`);
+            const summary = fullAsset.summary || {};
+            const cats = (fullAsset.category || []).map(c => c.name).join(', ');
+            const attrs = (fullAsset.attribute || []).join(', ');
+            const images = API.extractImages(fullAsset.media);
+
+            panel.innerHTML = `
+                <h3>${API.escapeHtml(fullAsset.title || 'Untitled')}</h3>
+                <div class="detail-row"><div class="detail-label">ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(fullAsset.id)}</code></div></div>
+                <div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(fullAsset.type || '')}</span></div></div>
+                ${fullAsset.productionYear ? `<div class="detail-row"><div class="detail-label">Year</div><div class="detail-value">${fullAsset.productionYear}</div></div>` : ''}
+                ${fullAsset.runtime ? `<div class="detail-row"><div class="detail-label">Runtime</div><div class="detail-value">${fullAsset.runtime} min</div></div>` : ''}
+                ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
+                ${attrs ? `<div class="detail-row"><div class="detail-label">Attributes</div><div class="detail-value">${API.escapeHtml(attrs)}</div></div>` : ''}
+                ${summary.short ? `<div class="detail-row"><div class="detail-label">Summary</div><div class="detail-value">${API.escapeHtml(summary.short)}</div></div>` : ''}
+                ${summary.medium ? `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">${API.escapeHtml(summary.medium)}</div></div>` : ''}
+                ${summary.long ? `<div class="detail-row"><div class="detail-label">Full Description</div><div class="detail-value">${API.escapeHtml(summary.long)}</div></div>` : ''}
+            `;
+
+            panel.appendChild(API.jsonToggle(fullAsset));
+
+            renderImageGallery(container, images, fullAsset.title);
+
+        } catch (err) {
+            API.showError(panel, err.message);
+        }
+    }
+
+    // ============================================================
+    // SHARED HELPERS
+    // ============================================================
+
+    function renderImageGallery(container, images, title) {
         const gallerySection = document.createElement('div');
         gallerySection.style.marginTop = '20px';
 
@@ -383,20 +862,19 @@ const ImagesView = (() => {
 
                 const imgEl = document.createElement('img');
                 imgEl.src = img.href;
-                imgEl.alt = item.title || '';
+                imgEl.alt = title || '';
                 imgEl.className = 'img-gallery-img';
-                imgEl.addEventListener('click', () => openLightbox(img.href, item.title));
+                imgEl.addEventListener('click', () => openLightbox(img.href, title));
 
                 wrapper.appendChild(imgEl);
 
-                // Show image metadata
                 const meta = document.createElement('div');
                 meta.className = 'img-gallery-meta';
                 const parts = [];
                 if (img.label) parts.push(img.label);
                 if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
                 meta.innerHTML = `
-                    ${parts.length ? `<span>${API.escapeHtml(parts.join(' · '))}</span>` : ''}
+                    ${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}
                     <a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open in new tab</a>
                 `;
                 wrapper.appendChild(meta);
@@ -414,12 +892,6 @@ const ImagesView = (() => {
             `;
         }
         container.appendChild(gallerySection);
-
-        // JSON toggle for full data
-        const jsonSection = document.createElement('div');
-        jsonSection.style.marginTop = '16px';
-        jsonSection.appendChild(API.jsonToggle(item));
-        container.appendChild(jsonSection);
     }
 
     function openLightbox(src, title) {
