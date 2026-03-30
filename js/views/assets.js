@@ -116,8 +116,9 @@ const AssetsView = (() => {
 
     function getAssetThumb(asset) {
         if (asset.media && asset.media.length > 0) {
-            const renditions = asset.media[0].rendition || [];
-            const img = renditions.find(r => r.href);
+            const rend = asset.media[0].rendition || [];
+            const renditions = Array.isArray(rend) ? rend : [rend];
+            const img = renditions.find(r => r && r.href);
             if (img) {
                 return `<img src="${API.escapeHtml(img.href)}" class="thumb" alt="">`;
             }
@@ -184,7 +185,7 @@ const AssetsView = (() => {
 
         // Show images
         if (asset.media && asset.media.length > 0) {
-            const imgs = asset.media.flatMap(m => (m.rendition || []).filter(r => r.href));
+            const imgs = asset.media.flatMap(m => { const r = m.rendition || []; return (Array.isArray(r) ? r : [r]).filter(r => r && r.href); });
             if (imgs.length > 0) {
                 const mediaRow = document.createElement('div');
                 mediaRow.className = 'detail-row';

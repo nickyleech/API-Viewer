@@ -212,10 +212,14 @@ const ImagesView = (() => {
     function getImages(item) {
         const asset = item.asset || {};
         const media = asset.media || item.media || [];
+        const mediaArr = Array.isArray(media) ? media : [media];
         const images = [];
-        media.forEach(m => {
-            (m.rendition || []).forEach(r => {
-                if (r.href) images.push(r);
+        mediaArr.forEach(m => {
+            if (!m) return;
+            const renditions = m.rendition || [];
+            const rendArr = Array.isArray(renditions) ? renditions : [renditions];
+            rendArr.forEach(r => {
+                if (r && r.href) images.push(r);
             });
         });
         return images;

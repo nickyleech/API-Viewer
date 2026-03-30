@@ -220,7 +220,7 @@ const ScheduleView = (() => {
 
         // Show images from asset media
         if (asset.media && asset.media.length > 0) {
-            const imgs = asset.media.flatMap(m => (m.rendition || []).filter(r => r.href));
+            const imgs = asset.media.flatMap(m => { const r = m.rendition || []; return (Array.isArray(r) ? r : [r]).filter(r => r && r.href); });
             if (imgs.length > 0) {
                 const mediaRow = document.createElement('div');
                 mediaRow.className = 'detail-row';

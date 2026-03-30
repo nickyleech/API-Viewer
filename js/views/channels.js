@@ -206,8 +206,9 @@ const ChannelsView = (() => {
         // Show media/images if present
         if (ch.media && ch.media.length > 0) {
             const mediaHtml = ch.media.map(m => {
-                const renditions = m.rendition || [];
-                const img = renditions.find(r => r.href) || {};
+                const rend = m.rendition || [];
+                const renditions = Array.isArray(rend) ? rend : [rend];
+                const img = renditions.find(r => r && r.href) || {};
                 return img.href ? `<img src="${API.escapeHtml(img.href)}" class="thumb" alt="Channel logo" style="width:120px;height:auto;margin:4px;">` : '';
             }).join('');
             if (mediaHtml) {
