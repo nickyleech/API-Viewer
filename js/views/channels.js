@@ -1,14 +1,19 @@
 const ChannelsView = (() => {
     let platforms = [];
     let regions = [];
+    let allChannels = [];
 
     async function render(container) {
         container.innerHTML = `
             <div class="view-header">
                 <h2>Channels</h2>
-                <p>Search channels by platform, region, and date.</p>
+                <p>Browse all TV and radio channels. Use the search box to find a channel by name, or filter by platform and region.</p>
             </div>
             <div class="filter-bar">
+                <div class="form-group" style="flex:1;min-width:250px">
+                    <label>Search</label>
+                    <input type="text" id="ch-search-input" class="input" placeholder="Type to filter by channel name..." style="width:100%">
+                </div>
                 <div class="form-group">
                     <label>Platform</label>
                     <select id="ch-platform" class="select">
@@ -22,12 +27,8 @@ const ChannelsView = (() => {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Date</label>
-                    <input type="date" id="ch-date" class="input" style="min-width:160px">
-                </div>
-                <div class="form-group">
                     <label>&nbsp;</label>
-                    <button id="ch-search" class="btn btn-primary">Search</button>
+                    <button id="ch-fetch" class="btn btn-primary">Load Channels</button>
                 </div>
             </div>
             <div id="channels-results"></div>
@@ -35,7 +36,11 @@ const ChannelsView = (() => {
 
         await loadPlatforms();
         document.getElementById('ch-platform').addEventListener('change', onPlatformChange);
-        document.getElementById('ch-search').addEventListener('click', searchChannels);
+        document.getElementById('ch-fetch').addEventListener('click', fetchChannels);
+        document.getElementById('ch-search-input').addEventListener('input', filterChannels);
+
+        // Auto-load all channels on render
+        await fetchChannels();
     }
 
     async function loadPlatforms() {
@@ -43,7 +48,7 @@ const ChannelsView = (() => {
         try {
             const data = await API.fetch('/platform');
             platforms = data.item || [];
-            sel.innerHTML = '<option value="">-- Select Platform --</option>';
+            sel.innerHTML = '<option value="">-- All Platforms --</option>';
             platforms.forEach(p => {
                 sel.innerHTML += `<option value="${API.escapeHtml(p.id)}">${API.escapeHtml(p.title)}</option>`;
             });
@@ -74,37 +79,49 @@ const ChannelsView = (() => {
         }
     }
 
-    async function searchChannels() {
+    async function fetchChannels() {
         const results = document.getElementById('channels-results');
         const platformId = document.getElementById('ch-platform').value;
         const regionId = document.getElementById('ch-region').value;
-        const date = document.getElementById('ch-date').value;
 
         const params = {};
         if (platformId) params.platformId = platformId;
         if (regionId) params.regionId = regionId;
-        if (date) params.date = date;
 
         API.showLoading(results);
         try {
             const data = await API.fetch('/channel', params);
-            renderChannels(results, data);
+            allChannels = data.item || [];
+            renderChannels(results, allChannels, data);
         } catch (err) {
+            allChannels = [];
             API.showError(results, err.message);
         }
     }
 
-    function renderChannels(container, data) {
+    function filterChannels() {
+        const query = (document.getElementById('ch-search-input').value || '').toLowerCase().trim();
+        const results = document.getElementById('channels-results');
+
+        if (!allChannels.length) return;
+
+        const filtered = query
+            ? allChannels.filter(ch => (ch.title || '').toLowerCase().includes(query))
+            : allChannels;
+
+        renderChannels(results, filtered, null);
+    }
+
+    function renderChannels(container, items, rawData) {
         container.innerHTML = '';
-        const items = data.item || [];
         if (items.length === 0) {
-            API.showEmpty(container, 'No channels found. Try different filters.');
+            API.showEmpty(container, 'No channels found matching your search.');
             return;
         }
 
         const info = document.createElement('div');
         info.className = 'results-info';
-        info.textContent = `${data.total || items.length} channel(s)`;
+        info.textContent = `Showing ${items.length} of ${allChannels.length} channel(s)`;
         container.appendChild(info);
 
         const table = document.createElement('table');
@@ -112,13 +129,13 @@ const ChannelsView = (() => {
         table.innerHTML = `
             <thead>
                 <tr>
-                    <th>EPG</th>
                     <th>Channel</th>
+                    <th>API ID</th>
                     <th>Category</th>
                     <th>Attributes</th>
                 </tr>
             </thead>
-            <tbody id="ch-tbody"></tbody>
+            <tbody></tbody>
         `;
         container.appendChild(table);
 
@@ -131,8 +148,8 @@ const ChannelsView = (() => {
                 `<span class="badge ${a === 'hd' ? 'badge-green' : 'badge-gray'}">${API.escapeHtml(a)}</span>`
             ).join(' ');
             tr.innerHTML = `
-                <td>${API.escapeHtml(ch.epg || '-')}</td>
                 <td><strong>${API.escapeHtml(ch.title)}</strong></td>
+                <td><code style="font-size:12px;color:var(--color-accent);user-select:all">${API.escapeHtml(ch.id)}</code></td>
                 <td>${API.escapeHtml(cats || '-')}</td>
                 <td>${attrs || '-'}</td>
             `;
@@ -140,7 +157,9 @@ const ChannelsView = (() => {
             tbody.appendChild(tr);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        if (rawData) {
+            container.appendChild(API.jsonToggle(rawData));
+        }
     }
 
     async function showChannelDetail(channel) {
@@ -176,7 +195,7 @@ const ChannelsView = (() => {
             <h3>${API.escapeHtml(ch.title)}</h3>
             <div class="detail-row">
                 <div class="detail-label">ID</div>
-                <div class="detail-value">${API.escapeHtml(ch.id)}</div>
+                <div class="detail-value"><code style="user-select:all">${API.escapeHtml(ch.id)}</code></div>
             </div>
             ${ch.epg ? `<div class="detail-row"><div class="detail-label">EPG Number</div><div class="detail-value">${API.escapeHtml(ch.epg)}</div></div>` : ''}
             ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}

@@ -577,6 +577,61 @@ body {
     background: var(--color-bg);
 }
 
+/* ===== Channel Search Dropdown ===== */
+.channel-dropdown {
+    display: none;
+    position: absolute;
+    z-index: 50;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+}
+
+.form-group:has(.channel-dropdown) {
+    position: relative;
+}
+
+.dropdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background var(--transition);
+    gap: 12px;
+}
+
+.dropdown-item:hover {
+    background: #e8f2fc;
+}
+
+.dropdown-item strong {
+    flex-shrink: 0;
+}
+
+.dropdown-id {
+    font-family: "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-empty {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    text-align: center;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .app-layout {
