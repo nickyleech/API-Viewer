@@ -9,6 +9,7 @@ const ImagesView = (() => {
     let catalogues = [];
     let programmeResults = [];
     let savedProgrammeView = null;
+    let currentCatalogueId = '';
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
@@ -450,6 +451,16 @@ const ImagesView = (() => {
         }
     }
 
+    // Extract type from catalogue asset - may be at top level or nested in .asset
+    function getAssetType(item) {
+        return item.type || (item.asset && item.asset.type) || '';
+    }
+
+    // Extract the actual asset ID - may be at top level or nested in .asset
+    function getAssetId(item) {
+        return item.id || (item.asset && item.asset.id) || '';
+    }
+
     async function searchProgrammes() {
         const results = document.getElementById('prog-results');
         const catalogueId = document.getElementById('prog-catalogue').value;
@@ -464,6 +475,7 @@ const ImagesView = (() => {
             return;
         }
 
+        currentCatalogueId = catalogueId;
         API.showLoading(results);
         try {
             const data = await API.fetch(`/catalogue/${catalogueId}/asset`, { title, limit: 50 });
@@ -483,10 +495,12 @@ const ImagesView = (() => {
             return;
         }
 
-        // Group by type
-        const series = items.filter(a => a.type === 'series');
-        const movies = items.filter(a => a.type === 'movie');
-        const others = items.filter(a => a.type !== 'series' && a.type !== 'movie');
+        // Group by type (type may be nested in .asset)
+        const series = items.filter(a => getAssetType(a) === 'series');
+        const movies = items.filter(a => getAssetType(a) === 'movie');
+        const seasons = items.filter(a => getAssetType(a) === 'season');
+        const episodes = items.filter(a => getAssetType(a) === 'episode');
+        const others = items.filter(a => !['series', 'movie', 'season', 'episode'].includes(getAssetType(a)));
 
         const info = document.createElement('div');
         info.className = 'results-info';
@@ -496,6 +510,8 @@ const ImagesView = (() => {
         const allGroups = [];
         if (series.length > 0) allGroups.push({ label: 'Series', items: series });
         if (movies.length > 0) allGroups.push({ label: 'Movies', items: movies });
+        if (seasons.length > 0) allGroups.push({ label: 'Seasons', items: seasons });
+        if (episodes.length > 0) allGroups.push({ label: 'Episodes', items: episodes });
         if (others.length > 0) allGroups.push({ label: 'Other', items: others });
 
         allGroups.forEach(group => {
@@ -504,24 +520,26 @@ const ImagesView = (() => {
             heading.textContent = `${group.label} (${group.items.length})`;
             container.appendChild(heading);
 
-            group.items.forEach(asset => {
+            group.items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'card clickable';
 
+                const type = getAssetType(item);
                 const typeColors = { movie: 'badge-orange', episode: 'badge-blue', series: 'badge-purple', season: 'badge-green' };
-                const typeBadge = `<span class="badge ${typeColors[asset.type] || 'badge-gray'}">${API.escapeHtml(asset.type || 'unknown')}</span>`;
-                const cats = (asset.category || []).map(c => c.name).join(', ');
-                const summary = asset.summary || {};
-                const imgs = API.extractImages(asset.media);
+                const typeBadge = `<span class="badge ${typeColors[type] || 'badge-gray'}">${API.escapeHtml(type || 'unknown')}</span>`;
+                const cats = (item.category || (item.asset && item.asset.category) || []).map(c => c.name).join(', ');
+                const summary = item.summary || (item.asset && item.asset.summary) || {};
+                const imgs = API.extractImages(item.media || (item.asset && item.asset.media));
+                const year = item.productionYear || (item.asset && item.asset.productionYear);
 
                 card.innerHTML = `
                     <div style="display:flex;gap:12px;align-items:start">
                         ${imgs.length > 0 ? `<img src="${API.escapeHtml(imgs[0].href)}" class="thumb" alt="">` : ''}
                         <div style="flex:1">
-                            <div class="card-title">${API.escapeHtml(asset.title || 'Untitled')}</div>
+                            <div class="card-title">${API.escapeHtml(item.title || (item.asset && item.asset.title) || 'Untitled')}</div>
                             <div class="card-meta">
                                 ${typeBadge}
-                                ${asset.productionYear ? `<span class="badge badge-gray">${asset.productionYear}</span>` : ''}
+                                ${year ? `<span class="badge badge-gray">${year}</span>` : ''}
                                 ${imgs.length > 0 ? `<span class="badge badge-green">${imgs.length} image(s)</span>` : ''}
                                 ${cats ? `<span class="card-subtitle">${API.escapeHtml(cats)}</span>` : ''}
                             </div>
@@ -530,10 +548,10 @@ const ImagesView = (() => {
                     </div>
                 `;
 
-                if (asset.type === 'series') {
-                    card.addEventListener('click', () => showSeriesDetail(asset));
+                if (type === 'series') {
+                    card.addEventListener('click', () => showSeriesDetail(item));
                 } else {
-                    card.addEventListener('click', () => showAssetImageDetail(asset));
+                    card.addEventListener('click', () => showAssetImageDetail(item));
                 }
                 container.appendChild(card);
             });
@@ -551,8 +569,9 @@ const ImagesView = (() => {
         }
     }
 
-    async function showSeriesDetail(seriesAsset) {
+    async function showSeriesDetail(seriesItem) {
         const container = document.getElementById('content');
+        const assetId = getAssetId(seriesItem);
 
         // Save current view
         savedProgrammeView = document.createDocumentFragment();
@@ -574,8 +593,8 @@ const ImagesView = (() => {
         API.showLoading(panel);
 
         try {
-            // Fetch full series detail
-            const series = await API.fetch(`/asset/${seriesAsset.id}`);
+            // Fetch full series detail via catalogue endpoint
+            const series = await API.fetch(`/catalogue/${currentCatalogueId}/asset/${assetId}`);
             const summary = series.summary || {};
             const cats = (series.category || []).map(c => c.name).join(', ');
             const seriesImgs = API.extractImages(series.media);
@@ -623,12 +642,12 @@ const ImagesView = (() => {
             progress.textContent = `Loading ${relatedSeasons.length} season(s)...`;
             container.appendChild(progress);
 
-            // Fetch seasons in batches of 5
+            // Fetch seasons in batches of 5 via catalogue endpoint
             const seasons = [];
             for (let i = 0; i < relatedSeasons.length; i += 5) {
                 const batch = relatedSeasons.slice(i, i + 5);
                 const batchResults = await Promise.all(
-                    batch.map(r => API.fetch(`/asset/${r.id}`).catch(() => null))
+                    batch.map(r => API.fetch(`/catalogue/${currentCatalogueId}/asset/${r.id}`).catch(() => null))
                 );
                 batchResults.forEach(s => { if (s) seasons.push(s); });
                 progress.textContent = `Loaded ${Math.min(i + 5, relatedSeasons.length)} of ${relatedSeasons.length} season(s)...`;
@@ -740,12 +759,12 @@ const ImagesView = (() => {
         epProgress.textContent = `Loading ${relatedEpisodes.length} episode(s)...`;
         container.appendChild(epProgress);
 
-        // Fetch episodes in batches of 5
+        // Fetch episodes in batches of 5 via catalogue endpoint
         const episodes = [];
         for (let i = 0; i < relatedEpisodes.length; i += 5) {
             const batch = relatedEpisodes.slice(i, i + 5);
             const batchResults = await Promise.all(
-                batch.map(r => API.fetch(`/asset/${r.id}`).catch(() => null))
+                batch.map(r => API.fetch(`/catalogue/${currentCatalogueId}/asset/${r.id}`).catch(() => null))
             );
             batchResults.forEach(ep => { if (ep) episodes.push(ep); });
             epProgress.textContent = `Loaded ${Math.min(i + 5, relatedEpisodes.length)} of ${relatedEpisodes.length} episode(s)...`;
@@ -789,8 +808,9 @@ const ImagesView = (() => {
         });
     }
 
-    async function showAssetImageDetail(asset) {
+    async function showAssetImageDetail(item) {
         const container = document.getElementById('content');
+        const assetId = getAssetId(item);
 
         // Save current view
         if (!savedProgrammeView) {
@@ -814,8 +834,8 @@ const ImagesView = (() => {
         container.appendChild(panel);
 
         try {
-            // Fetch full asset detail
-            const fullAsset = await API.fetch(`/asset/${asset.id}`);
+            // Fetch full asset detail via catalogue endpoint
+            const fullAsset = await API.fetch(`/catalogue/${currentCatalogueId}/asset/${assetId}`);
             const summary = fullAsset.summary || {};
             const cats = (fullAsset.category || []).map(c => c.name).join(', ');
             const attrs = (fullAsset.attribute || []).join(', ');
