@@ -6,7 +6,8 @@ const App = (() => {
         assets: AssetsView,
         contributors: ContributorsView,
         features: FeaturesView,
-        catalogues: CataloguesView
+        catalogues: CataloguesView,
+        images: ImagesView
     };
 
     let currentView = null;
