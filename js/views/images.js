@@ -479,8 +479,34 @@ const ImagesView = (() => {
         API.showLoading(results);
         try {
             const data = await API.fetch(`/catalogue/${catalogueId}/asset`, { title, limit: 50 });
-            programmeResults = data.item || [];
-            renderProgrammeResults(results, programmeResults);
+            const basicItems = data.item || [];
+            if (basicItems.length === 0) {
+                API.showEmpty(results, 'No programmes found matching your search.');
+                return;
+            }
+
+            // Fetch full details for each result to get type, season/episode info
+            results.innerHTML = '';
+            const progress = document.createElement('div');
+            progress.className = 'results-info';
+            progress.textContent = `Loading details for ${basicItems.length} result(s)...`;
+            results.appendChild(progress);
+
+            const fullItems = [];
+            for (let i = 0; i < basicItems.length; i += 5) {
+                const batch = basicItems.slice(i, i + 5);
+                const batchResults = await Promise.all(
+                    batch.map(item => {
+                        const id = getAssetId(item);
+                        return API.fetch(`/catalogue/${catalogueId}/asset/${id}`).catch(() => item);
+                    })
+                );
+                fullItems.push(...batchResults);
+                progress.textContent = `Loaded ${Math.min(i + 5, basicItems.length)} of ${basicItems.length} result(s)...`;
+            }
+
+            programmeResults = fullItems;
+            renderProgrammeResults(results, fullItems);
         } catch (err) {
             programmeResults = [];
             API.showError(results, err.message);
@@ -495,67 +521,218 @@ const ImagesView = (() => {
             return;
         }
 
-        // Group by type (type may be nested in .asset)
-        const series = items.filter(a => getAssetType(a) === 'series');
-        const movies = items.filter(a => getAssetType(a) === 'movie');
-        const seasons = items.filter(a => getAssetType(a) === 'season');
-        const episodes = items.filter(a => getAssetType(a) === 'episode');
-        const others = items.filter(a => !['series', 'movie', 'season', 'episode'].includes(getAssetType(a)));
+        // Now we have full details — group by type
+        const seriesItems = items.filter(a => a.type === 'series');
+        const movieItems = items.filter(a => a.type === 'movie');
+        const episodeItems = items.filter(a => a.type === 'episode');
+        const otherItems = items.filter(a => !['series', 'movie', 'episode'].includes(a.type || ''));
 
         const info = document.createElement('div');
         info.className = 'results-info';
         info.textContent = `${items.length} result(s)`;
         container.appendChild(info);
 
-        const allGroups = [];
-        if (series.length > 0) allGroups.push({ label: 'Series', items: series });
-        if (movies.length > 0) allGroups.push({ label: 'Movies', items: movies });
-        if (seasons.length > 0) allGroups.push({ label: 'Seasons', items: seasons });
-        if (episodes.length > 0) allGroups.push({ label: 'Episodes', items: episodes });
-        if (others.length > 0) allGroups.push({ label: 'Other', items: others });
+        // Render series (clickable to drill down)
+        if (seriesItems.length > 0) {
+            renderAssetGroup(container, 'Series', seriesItems, 'series');
+        }
 
-        allGroups.forEach(group => {
-            const heading = document.createElement('h3');
-            heading.style.cssText = 'margin:16px 0 8px;font-size:16px;';
-            heading.textContent = `${group.label} (${group.items.length})`;
-            container.appendChild(heading);
+        // Render movies
+        if (movieItems.length > 0) {
+            renderAssetGroup(container, 'Movies', movieItems, 'movie');
+        }
 
-            group.items.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'card clickable';
+        // Render episodes grouped by season
+        if (episodeItems.length > 0) {
+            renderEpisodesBySeason(container, episodeItems);
+        }
 
-                const type = getAssetType(item);
-                const typeColors = { movie: 'badge-orange', episode: 'badge-blue', series: 'badge-purple', season: 'badge-green' };
-                const typeBadge = `<span class="badge ${typeColors[type] || 'badge-gray'}">${API.escapeHtml(type || 'unknown')}</span>`;
-                const cats = (item.category || (item.asset && item.asset.category) || []).map(c => c.name).join(', ');
-                const summary = item.summary || (item.asset && item.asset.summary) || {};
-                const imgs = API.extractImages(item.media || (item.asset && item.asset.media));
-                const year = item.productionYear || (item.asset && item.asset.productionYear);
+        // Render other
+        if (otherItems.length > 0) {
+            renderAssetGroup(container, 'Other', otherItems, 'other');
+        }
+    }
 
-                card.innerHTML = `
-                    <div style="display:flex;gap:12px;align-items:start">
-                        ${imgs.length > 0 ? `<img src="${API.escapeHtml(imgs[0].href)}" class="thumb" alt="">` : ''}
-                        <div style="flex:1">
-                            <div class="card-title">${API.escapeHtml(item.title || (item.asset && item.asset.title) || 'Untitled')}</div>
-                            <div class="card-meta">
-                                ${typeBadge}
-                                ${year ? `<span class="badge badge-gray">${year}</span>` : ''}
-                                ${imgs.length > 0 ? `<span class="badge badge-green">${imgs.length} image(s)</span>` : ''}
-                                ${cats ? `<span class="card-subtitle">${API.escapeHtml(cats)}</span>` : ''}
-                            </div>
-                            ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
+    function renderAssetGroup(container, label, items, groupType) {
+        const heading = document.createElement('h3');
+        heading.style.cssText = 'margin:16px 0 8px;font-size:16px;';
+        heading.textContent = `${label} (${items.length})`;
+        container.appendChild(heading);
+
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'card clickable';
+
+            const typeColors = { movie: 'badge-orange', episode: 'badge-blue', series: 'badge-purple', season: 'badge-green' };
+            const typeBadge = `<span class="badge ${typeColors[item.type] || 'badge-gray'}">${API.escapeHtml(item.type || 'unknown')}</span>`;
+            const summary = item.summary || {};
+            const imgs = API.extractImages(item.media);
+
+            card.innerHTML = `
+                <div style="display:flex;gap:12px;align-items:start">
+                    ${imgs.length > 0 ? `<img src="${API.escapeHtml(imgs[0].href)}" class="thumb" alt="">` : ''}
+                    <div style="flex:1">
+                        <div class="card-title">${API.escapeHtml(item.title || 'Untitled')}</div>
+                        <div class="card-meta">
+                            ${typeBadge}
+                            ${item.productionYear ? `<span class="badge badge-gray">${item.productionYear}</span>` : ''}
+                            ${imgs.length > 0 ? `<span class="badge badge-green">${imgs.length} image(s)</span>` : ''}
                         </div>
+                        ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
                     </div>
-                `;
+                </div>
+            `;
 
-                if (type === 'series') {
-                    card.addEventListener('click', () => showSeriesDetail(item));
-                } else {
-                    card.addEventListener('click', () => showAssetImageDetail(item));
-                }
-                container.appendChild(card);
-            });
+            if (item.type === 'series') {
+                card.addEventListener('click', () => showSeriesDetail(item));
+            } else {
+                card.addEventListener('click', () => showAssetImageDetail(item));
+            }
+            container.appendChild(card);
         });
+    }
+
+    function renderEpisodesBySeason(container, episodes) {
+        // Group episodes by their parent season (from related links)
+        const seasonMap = new Map();
+        const noSeason = [];
+
+        episodes.forEach(ep => {
+            const seasonRel = (ep.related || []).find(r => r.type === 'season');
+            if (seasonRel) {
+                if (!seasonMap.has(seasonRel.id)) {
+                    seasonMap.set(seasonRel.id, { id: seasonRel.id, episodes: [] });
+                }
+                seasonMap.get(seasonRel.id).episodes.push(ep);
+            } else {
+                noSeason.push(ep);
+            }
+        });
+
+        const heading = document.createElement('h3');
+        heading.style.cssText = 'margin:16px 0 8px;font-size:16px;';
+        heading.textContent = `Episodes (${episodes.length})`;
+        container.appendChild(heading);
+
+        // Sort seasons - try to determine season number from episode data
+        const seasonGroups = [...seasonMap.values()];
+        seasonGroups.forEach(sg => {
+            // Try to extract season number from episode titles or seasonNumber field
+            sg.seasonNum = Infinity;
+            sg.episodes.forEach(ep => {
+                const num = ep.seasonNumber || ep.seriesNumber;
+                if (num && num < sg.seasonNum) sg.seasonNum = num;
+            });
+            if (sg.seasonNum === Infinity) {
+                // Try to extract from related season title patterns
+                const match = (sg.episodes[0]?.title || '').match(/S(\d+)/i);
+                sg.seasonNum = match ? parseInt(match[1]) : 999;
+            }
+        });
+        seasonGroups.sort((a, b) => a.seasonNum - b.seasonNum);
+
+        // Render each season as an accordion
+        seasonGroups.forEach(sg => {
+            // Sort episodes within season
+            sg.episodes.sort((a, b) => {
+                const numA = a.episodeNumber || parseInt((a.title || '').match(/(?:Ep(?:isode)?\.?\s*)(\d+)/i)?.[1]) || parseInt((a.title || '').match(/\d+/)?.[0]) || 0;
+                const numB = b.episodeNumber || parseInt((b.title || '').match(/(?:Ep(?:isode)?\.?\s*)(\d+)/i)?.[1]) || parseInt((b.title || '').match(/\d+/)?.[0]) || 0;
+                return numA - numB;
+            });
+
+            const seasonLabel = sg.seasonNum < 999 ? `Season ${sg.seasonNum}` : 'Unknown Season';
+            const imgCount = sg.episodes.reduce((sum, ep) => sum + API.extractImages(ep.media).length, 0);
+
+            const wrapper = document.createElement('div');
+            wrapper.style.marginBottom = '4px';
+
+            const header = document.createElement('div');
+            header.className = 'season-header';
+            header.innerHTML = `
+                <h4>
+                    ${API.escapeHtml(seasonLabel)}
+                    <span class="badge badge-gray" style="margin-left:8px">${sg.episodes.length} episode(s)</span>
+                    ${imgCount > 0 ? `<span class="badge badge-green" style="margin-left:4px">${imgCount} image(s)</span>` : ''}
+                </h4>
+                <span class="season-toggle">\u25BC</span>
+            `;
+
+            const episodesPanel = document.createElement('div');
+            episodesPanel.className = 'season-episodes';
+
+            // Render episode cards inside the panel
+            sg.episodes.forEach(ep => {
+                renderEpisodeCard(episodesPanel, ep);
+            });
+
+            header.addEventListener('click', () => {
+                episodesPanel.classList.toggle('open');
+                header.querySelector('.season-toggle').classList.toggle('open');
+            });
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(episodesPanel);
+            container.appendChild(wrapper);
+        });
+
+        // Episodes with no season
+        if (noSeason.length > 0) {
+            const wrapper = document.createElement('div');
+            wrapper.style.marginBottom = '4px';
+
+            const header = document.createElement('div');
+            header.className = 'season-header';
+            header.innerHTML = `
+                <h4>Unsorted Episodes <span class="badge badge-gray" style="margin-left:8px">${noSeason.length} episode(s)</span></h4>
+                <span class="season-toggle">\u25BC</span>
+            `;
+
+            const episodesPanel = document.createElement('div');
+            episodesPanel.className = 'season-episodes';
+
+            noSeason.forEach(ep => {
+                renderEpisodeCard(episodesPanel, ep);
+            });
+
+            header.addEventListener('click', () => {
+                episodesPanel.classList.toggle('open');
+                header.querySelector('.season-toggle').classList.toggle('open');
+            });
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(episodesPanel);
+            container.appendChild(wrapper);
+        }
+    }
+
+    function renderEpisodeCard(container, ep) {
+        const epImgs = API.extractImages(ep.media);
+        const summary = ep.summary || {};
+        const epNum = ep.episodeNumber;
+
+        const card = document.createElement('div');
+        card.className = 'card clickable';
+        card.style.marginBottom = '8px';
+
+        card.innerHTML = `
+            <div style="display:flex;gap:12px;align-items:start">
+                ${epImgs.length > 0 ? `<img src="${API.escapeHtml(epImgs[0].href)}" class="thumb" alt="">` : ''}
+                <div style="flex:1">
+                    <div class="card-title">
+                        ${epNum ? `<span style="color:var(--color-accent);font-weight:700">Ep ${epNum}</span> \u2014 ` : ''}${API.escapeHtml(ep.title || 'Untitled')}
+                    </div>
+                    <div class="card-meta">
+                        <span class="badge badge-blue">episode</span>
+                        ${ep.productionYear ? `<span class="badge badge-gray">${ep.productionYear}</span>` : ''}
+                        ${epImgs.length > 0 ? `<span class="badge badge-green">${epImgs.length} image(s)</span>` : '<span class="badge badge-orange">No images</span>'}
+                    </div>
+                    ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
+                </div>
+            </div>
+        `;
+
+        card.addEventListener('click', () => showAssetImageDetail(ep));
+        container.appendChild(card);
     }
 
     function restoreProgrammeView() {
