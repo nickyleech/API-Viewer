@@ -118,7 +118,7 @@ const ImagesView = (() => {
                         <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">ALL CHANNELS</span>
                         <div style="display:flex;gap:8px;align-items:center">
                             <input type="text" id="audit-browser-search" class="input" placeholder="Filter..." style="width:180px;height:28px;font-size:12px;padding:2px 8px">
-                            <button id="audit-select-all-visible" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Select All Visible</button>
+                            <button id="audit-unselect-all" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Unselect All</button>
                             <button id="audit-browser-close" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Close</button>
                         </div>
                     </div>
@@ -622,7 +622,10 @@ const ImagesView = (() => {
             document.getElementById('audit-channel-browser').style.display = 'none';
         });
         document.getElementById('audit-browser-search').addEventListener('input', () => renderChannelBrowser());
-        document.getElementById('audit-select-all-visible').addEventListener('click', selectAllVisibleChannels);
+        document.getElementById('audit-unselect-all').addEventListener('click', () => {
+            auditSelectedChannels = [];
+            renderSelectedChips();
+        });
     }
 
     function setupAuditChannelSearch() {
@@ -760,15 +763,6 @@ const ImagesView = (() => {
                 }
             });
             listDiv.appendChild(row);
-        });
-    }
-
-    function selectAllVisibleChannels() {
-        const listDiv = document.getElementById('audit-browser-list');
-        const checkboxes = listDiv.querySelectorAll('input[type="checkbox"]:not(:checked)');
-        checkboxes.forEach(cb => {
-            cb.checked = true;
-            cb.dispatchEvent(new Event('change'));
         });
     }
 
