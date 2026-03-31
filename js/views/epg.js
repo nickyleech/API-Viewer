@@ -4,56 +4,103 @@ const EpgView = (() => {
     let epgChannels = [];
     let filteredChannels = [];
 
+    // Variations tab state
+    let varRegions = [];
+    let varRegionData = null;
+    let varVariations = [];
+
     async function render(container) {
         container.innerHTML = `
             <div class="view-header">
                 <h2>EPG Numbers</h2>
                 <p>View the EPG channel numbers for any platform. Select a platform to see all channels sorted by EPG number, with optional region filtering and CSV download.</p>
             </div>
-            <div class="filter-bar">
-                <div class="form-group">
-                    <label>Platform</label>
-                    <select id="epg-platform" class="select" style="min-width:200px">
-                        <option value="">Loading...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Region</label>
-                    <select id="epg-region" class="select" style="min-width:200px">
-                        <option value="">Select a platform first</option>
-                    </select>
-                </div>
-                <div class="form-group" style="flex:1;min-width:200px">
-                    <label>Search</label>
-                    <input type="text" id="epg-search" class="input" placeholder="Filter by channel name..." style="width:100%">
-                </div>
-                <div class="form-group">
-                    <label>&nbsp;</label>
-                    <button id="epg-fetch" class="btn btn-primary">Load EPG</button>
-                </div>
+            <div class="view-tabs">
+                <button class="view-tab active" data-tab="epg-numbers">EPG Numbers</button>
+                <button class="view-tab" data-tab="variations">Variations</button>
             </div>
-            <div id="epg-results"></div>
+
+            <div id="tab-epg-numbers" class="tab-panel active">
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label>Platform</label>
+                        <select id="epg-platform" class="select" style="min-width:200px">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Region</label>
+                        <select id="epg-region" class="select" style="min-width:200px">
+                            <option value="">Select a platform first</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;min-width:200px">
+                        <label>Search</label>
+                        <input type="text" id="epg-search" class="input" placeholder="Filter by channel name..." style="width:100%">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="epg-fetch" class="btn btn-primary">Load EPG</button>
+                    </div>
+                </div>
+                <div id="epg-results"></div>
+            </div>
+
+            <div id="tab-variations" class="tab-panel">
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label>Platform</label>
+                        <select id="var-platform" class="select" style="min-width:200px">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="var-load" class="btn btn-primary">Load Variations</button>
+                    </div>
+                </div>
+                <div id="var-results"></div>
+            </div>
         `;
 
+        // Tab switching
+        container.querySelectorAll('.view-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                container.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+                container.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        // EPG Numbers tab
         document.getElementById('epg-platform').addEventListener('change', onPlatformChange);
         document.getElementById('epg-region').addEventListener('change', fetchEpg);
         document.getElementById('epg-fetch').addEventListener('click', fetchEpg);
         document.getElementById('epg-search').addEventListener('input', filterBySearch);
+
+        // Variations tab
+        document.getElementById('var-load').addEventListener('click', loadVariationsForPlatform);
 
         await loadPlatforms();
     }
 
     async function loadPlatforms() {
         const sel = document.getElementById('epg-platform');
+        const varSel = document.getElementById('var-platform');
         try {
             const data = await API.fetch('/platform');
             platforms = data.item || [];
             sel.innerHTML = '<option value="">-- Select Platform --</option>';
+            varSel.innerHTML = '<option value="">-- Select Platform --</option>';
             platforms.forEach(p => {
-                sel.innerHTML += `<option value="${API.escapeHtml(p.id)}">${API.escapeHtml(p.title)}</option>`;
+                const opt = `<option value="${API.escapeHtml(p.id)}">${API.escapeHtml(p.title)}</option>`;
+                sel.innerHTML += opt;
+                varSel.innerHTML += opt;
             });
         } catch (err) {
             sel.innerHTML = '<option value="">Error loading platforms</option>';
+            varSel.innerHTML = '<option value="">Error loading platforms</option>';
         }
     }
 
@@ -257,25 +304,16 @@ const EpgView = (() => {
 
     // --- Multi-region logic ---
 
-    async function fetchAllRegionData() {
-        const platformId = document.getElementById('epg-platform').value;
-        if (!platformId) {
-            API.toast('Please select a platform first.', 'warning');
-            return null;
-        }
-        if (regions.length === 0) {
-            API.toast('No regions available for this platform.', 'warning');
-            return null;
-        }
+    async function fetchAllRegionData(platformId, regionList, progressContainer) {
+        if (!platformId || regionList.length === 0) return null;
 
-        const results = document.getElementById('epg-results');
-        results.innerHTML = '<div class="spinner">Loading all regions... 0 / ' + regions.length + '</div>';
+        progressContainer.innerHTML = '<div class="spinner">Loading all regions... 0 / ' + regionList.length + '</div>';
 
         const regionData = {};
         const batchSize = 5;
 
-        for (let i = 0; i < regions.length; i += batchSize) {
-            const batch = regions.slice(i, i + batchSize);
+        for (let i = 0; i < regionList.length; i += batchSize) {
+            const batch = regionList.slice(i, i + batchSize);
             const promises = batch.map(async (r) => {
                 const name = r.title || r.name || 'Unnamed';
                 try {
@@ -289,9 +327,9 @@ const EpgView = (() => {
                 }
             });
             await Promise.all(promises);
-            const done = Math.min(i + batchSize, regions.length);
-            const spinner = results.querySelector('.spinner');
-            if (spinner) spinner.textContent = `Loading all regions... ${done} / ${regions.length}`;
+            const done = Math.min(i + batchSize, regionList.length);
+            const spinner = progressContainer.querySelector('.spinner');
+            if (spinner) spinner.textContent = `Loading all regions... ${done} / ${regionList.length}`;
         }
 
         return regionData;
@@ -324,7 +362,6 @@ const EpgView = (() => {
     }
 
     function buildVariations(regionData) {
-        // Build a map: channelTitle -> { regionName: epgNumber }
         const channelMap = {};
         const allRegionNames = Object.keys(regionData);
 
@@ -336,7 +373,6 @@ const EpgView = (() => {
             });
         });
 
-        // Find channels where EPG numbers differ or channel is missing from some regions
         const variations = [];
         Object.entries(channelMap).forEach(([title, regionEpgs]) => {
             const presentIn = Object.keys(regionEpgs);
@@ -354,31 +390,59 @@ const EpgView = (() => {
             }
         });
 
-        // Sort by channel title
-        variations.sort((a, b) => a.title.localeCompare(b.title));
+        // Sort by ascending EPG number (lowest EPG across regions)
+        variations.sort((a, b) => {
+            const aMin = Math.min(...Object.values(a.regionEpgs).map(Number));
+            const bMin = Math.min(...Object.values(b.regionEpgs).map(Number));
+            return aMin - bMin;
+        });
         return variations;
     }
 
-    // --- Excel download ---
+    function getMode(regionEpgs) {
+        const counts = {};
+        Object.values(regionEpgs).forEach(epg => {
+            counts[epg] = (counts[epg] || 0) + 1;
+        });
+        let mode = null;
+        let maxCount = 0;
+        Object.entries(counts).forEach(([epg, count]) => {
+            if (count > maxCount) {
+                maxCount = count;
+                mode = epg;
+            }
+        });
+        return mode;
+    }
+
+    // --- Excel download (EPG Numbers tab) ---
 
     async function downloadAllRegionsExcel() {
-        const regionData = await fetchAllRegionData();
-        if (!regionData) return;
+        const platformId = document.getElementById('epg-platform').value;
+        if (!platformId) {
+            API.toast('Please select a platform first.', 'warning');
+            return;
+        }
+        if (regions.length === 0) {
+            API.toast('No regions available for this platform.', 'warning');
+            return;
+        }
 
         const results = document.getElementById('epg-results');
+        const regionData = await fetchAllRegionData(platformId, regions, results);
+        if (!regionData) return;
+
         results.innerHTML = '<div class="spinner">Generating Excel file...</div>';
 
         const groups = groupRegionsByCountry(regionData);
         const platformName = getPlatformName();
         const wb = XLSX.utils.book_new();
 
-        // Create a sheet for each country group
         Object.entries(groups).forEach(([country, countryRegions]) => {
             const regionNames = Object.keys(countryRegions);
             if (regionNames.length === 0) return;
 
             const rows = [];
-            // For single-region groups, simple table
             if (regionNames.length === 1) {
                 const rName = regionNames[0];
                 const channels = countryRegions[rName];
@@ -394,7 +458,6 @@ const EpgView = (() => {
                     });
                 });
             } else {
-                // Multiple regions in this group — merge all channels, show per region
                 const allChannels = new Map();
                 regionNames.forEach(rName => {
                     countryRegions[rName].forEach(ch => {
@@ -411,7 +474,6 @@ const EpgView = (() => {
                     });
                 });
 
-                // Sort by lowest EPG number
                 const sorted = [...allChannels.values()].sort((a, b) => {
                     const aMin = Math.min(...Object.values(a.regionEpgs).map(Number));
                     const bMin = Math.min(...Object.values(b.regionEpgs).map(Number));
@@ -458,25 +520,32 @@ const EpgView = (() => {
         XLSX.writeFile(wb, `EPG_${safePlatform}_All_Regions.xlsx`);
 
         API.toast('Excel file downloaded.', 'success');
-
-        // Restore the single-region view
         fetchEpg();
     }
 
     // --- In-page multi-region view ---
 
     async function showAllRegionsView() {
-        const regionData = await fetchAllRegionData();
-        if (!regionData) return;
+        const platformId = document.getElementById('epg-platform').value;
+        if (!platformId) {
+            API.toast('Please select a platform first.', 'warning');
+            return;
+        }
+        if (regions.length === 0) {
+            API.toast('No regions available for this platform.', 'warning');
+            return;
+        }
 
         const results = document.getElementById('epg-results');
+        const regionData = await fetchAllRegionData(platformId, regions, results);
+        if (!regionData) return;
+
         results.innerHTML = '';
 
         const groups = groupRegionsByCountry(regionData);
         const variations = buildVariations(regionData);
         const platformName = getPlatformName();
 
-        // Header
         const header = document.createElement('div');
         header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;';
         header.innerHTML = `<h3 style="margin:0">${API.escapeHtml(platformName)} — All Regions</h3>`;
@@ -488,7 +557,6 @@ const EpgView = (() => {
         header.appendChild(backBtn);
         results.appendChild(header);
 
-        // Build tabs
         const tabNames = [];
         Object.entries(groups).forEach(([country, countryRegions]) => {
             if (Object.keys(countryRegions).length > 0) tabNames.push(country);
@@ -528,7 +596,6 @@ const EpgView = (() => {
             tabBar.appendChild(tab);
         });
 
-        // Render first tab
         if (tabNames.length > 0) {
             renderTabContent(tabContent, tabNames[0], groups, variations, regionData);
         }
@@ -552,7 +619,6 @@ const EpgView = (() => {
         }
 
         if (regionNames.length === 1) {
-            // Single region — simple table
             const rName = regionNames[0];
             const channels = countryRegions[rName];
 
@@ -561,9 +627,8 @@ const EpgView = (() => {
             info.textContent = `${rName} — ${channels.length} channel(s)`;
             container.appendChild(info);
 
-            renderSimpleRegionTable(container, channels, rName);
+            renderSimpleRegionTable(container, channels);
         } else {
-            // Multiple regions — merged table with EPG per region columns
             const allChannels = new Map();
             regionNames.forEach(rName => {
                 countryRegions[rName].forEach(ch => {
@@ -624,7 +689,7 @@ const EpgView = (() => {
         }
     }
 
-    function renderSimpleRegionTable(container, channels, regionName) {
+    function renderSimpleRegionTable(container, channels) {
         const table = document.createElement('table');
         table.className = 'data-table';
         table.innerHTML = `
@@ -658,7 +723,7 @@ const EpgView = (() => {
 
     function renderVariationsTable(container, variations, regionData) {
         if (variations.length === 0) {
-            API.showEmpty(container, 'No variations found — all channels have the same EPG number across all regions.');
+            API.showEmpty(container, 'No variations found \u2014 all channels have the same EPG number across all regions.');
             return;
         }
 
@@ -698,6 +763,246 @@ const EpgView = (() => {
         });
         table.appendChild(tbody);
         container.appendChild(table);
+    }
+
+    // --- Variations tab ---
+
+    async function loadVariationsForPlatform() {
+        const platformId = document.getElementById('var-platform').value;
+        const results = document.getElementById('var-results');
+
+        if (!platformId) {
+            API.toast('Please select a platform.', 'warning');
+            return;
+        }
+
+        const platformName = document.getElementById('var-platform').options[document.getElementById('var-platform').selectedIndex].text;
+
+        // Fetch regions for this platform
+        API.showLoading(results);
+        try {
+            const data = await API.fetch(`/platform/${platformId}/region`);
+            varRegions = data.item || data || [];
+        } catch (err) {
+            API.showError(results, err.message);
+            return;
+        }
+
+        if (varRegions.length < 2) {
+            results.innerHTML = '';
+            const notice = document.createElement('div');
+            notice.style.cssText = 'padding:12px 16px;background:var(--color-warning-bg, #fff8e1);border:1px solid var(--color-warning, #e67e00);border-radius:4px;font-size:13px;color:var(--color-text)';
+            notice.textContent = varRegions.length === 0
+                ? 'This platform has no regions. Variations require at least 2 regions to compare.'
+                : 'This platform has only 1 region. Variations require at least 2 regions to compare.';
+            results.appendChild(notice);
+            return;
+        }
+
+        // Fetch all region data
+        varRegionData = await fetchAllRegionData(platformId, varRegions, results);
+        if (!varRegionData) return;
+
+        varVariations = buildVariations(varRegionData);
+        renderVariationsWithFormatting(results, varVariations, varRegionData, platformName);
+    }
+
+    function renderVariationsWithFormatting(container, variations, regionData, platformName) {
+        container.innerHTML = '';
+        const allRegionNames = Object.keys(regionData);
+
+        if (variations.length === 0) {
+            API.showEmpty(container, 'No variations found \u2014 all channels have the same EPG number across all regions.');
+            return;
+        }
+
+        // Info bar
+        const info = document.createElement('div');
+        info.className = 'results-info';
+        info.style.cssText = 'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px';
+        info.innerHTML = `<span>${variations.length} channel(s) with regional differences across ${allRegionNames.length} regions</span>`;
+
+        const btnGroup = document.createElement('div');
+        btnGroup.style.cssText = 'display:flex;gap:6px';
+
+        const dlPlatformBtn = document.createElement('button');
+        dlPlatformBtn.className = 'btn btn-sm btn-primary';
+        dlPlatformBtn.textContent = 'Download Platform Variations';
+        dlPlatformBtn.addEventListener('click', () => downloadPlatformVariationsExcel(variations, regionData, platformName));
+        btnGroup.appendChild(dlPlatformBtn);
+
+        const dlAllBtn = document.createElement('button');
+        dlAllBtn.className = 'btn btn-sm btn-secondary';
+        dlAllBtn.textContent = 'Download All Platforms Variations';
+        dlAllBtn.addEventListener('click', downloadAllPlatformsVariationsExcel);
+        btnGroup.appendChild(dlAllBtn);
+
+        info.appendChild(btnGroup);
+        container.appendChild(info);
+
+        // Legend
+        const legend = document.createElement('div');
+        legend.style.cssText = 'display:flex;gap:16px;margin-bottom:12px;font-size:12px;flex-wrap:wrap';
+        legend.innerHTML = `
+            <span><span style="display:inline-block;width:14px;height:14px;background:#e6f7ec;border:1px solid #b2dfdb;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Matches mode</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Differs from mode</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Not present</span>
+        `;
+        container.appendChild(legend);
+
+        // Table
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = '<th>Channel Name</th><th style="text-align:center">Coverage</th><th style="text-align:center">Mode</th>';
+        allRegionNames.forEach(rName => {
+            headerRow.innerHTML += `<th style="text-align:center;min-width:50px;font-size:11px">${API.escapeHtml(rName)}</th>`;
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        variations.forEach(v => {
+            const tr = document.createElement('tr');
+            const mode = getMode(v.regionEpgs);
+            let html = `<td>${API.escapeHtml(v.title)}</td>`;
+            html += `<td style="text-align:center;font-size:12px">${v.presentCount}/${v.totalRegions}</td>`;
+            html += `<td style="text-align:center;font-weight:600">${API.escapeHtml(mode || '-')}</td>`;
+            allRegionNames.forEach(rName => {
+                const epg = v.regionEpgs[rName];
+                if (!epg) {
+                    html += `<td style="text-align:center;background:#f5f5f5;color:#999">-</td>`;
+                } else if (epg === mode) {
+                    html += `<td style="text-align:center;background:#e6f7ec"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                } else {
+                    html += `<td style="text-align:center;background:#fff3e0;font-weight:700;color:#e65100"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                }
+            });
+            tr.innerHTML = html;
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+    }
+
+    function downloadPlatformVariationsExcel(variations, regionData, platformName) {
+        if (variations.length === 0) {
+            API.toast('No variations to download.', 'warning');
+            return;
+        }
+
+        const allRegionNames = Object.keys(regionData);
+        const wb = XLSX.utils.book_new();
+
+        const rows = variations.map(v => {
+            const mode = getMode(v.regionEpgs);
+            const row = {
+                'Channel Name': v.title,
+                'Coverage': `${v.presentCount}/${v.totalRegions}`,
+                'Mode EPG': mode || '-'
+            };
+            allRegionNames.forEach(rName => {
+                row[rName] = v.regionEpgs[rName] ? parseInt(v.regionEpgs[rName]) : '';
+            });
+            return row;
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Variations');
+
+        const safePlatform = platformName.replace(/[^a-zA-Z0-9]/g, '_');
+        XLSX.writeFile(wb, `EPG_Variations_${safePlatform}.xlsx`);
+        API.toast('Excel file downloaded.', 'success');
+    }
+
+    async function downloadAllPlatformsVariationsExcel() {
+        if (!confirm('This will fetch EPG data for all regions across every platform. This may take a while. Continue?')) return;
+
+        const results = document.getElementById('var-results');
+        const wb = XLSX.utils.book_new();
+        let sheetsAdded = 0;
+
+        // Progress bar
+        const progress = document.createElement('div');
+        progress.style.cssText = 'margin:16px 0';
+        progress.innerHTML = `
+            <div style="font-size:13px;margin-bottom:6px;color:var(--color-text-secondary)">Processing platforms... 0 / ${platforms.length}</div>
+            <div style="width:100%;height:8px;background:var(--color-border);border-radius:4px;overflow:hidden">
+                <div style="width:0%;height:100%;background:var(--color-accent);transition:width 0.3s"></div>
+            </div>
+        `;
+        results.insertBefore(progress, results.firstChild);
+
+        const progressText = progress.querySelector('div');
+        const progressBar = progress.querySelector('div > div > div');
+
+        for (let i = 0; i < platforms.length; i++) {
+            const platform = platforms[i];
+            const pName = platform.title || platform.id;
+            progressText.textContent = `Processing ${pName}... ${i + 1} / ${platforms.length}`;
+            progressBar.style.width = `${((i + 1) / platforms.length) * 100}%`;
+
+            // Fetch regions for this platform
+            let pRegions = [];
+            try {
+                const data = await API.fetch(`/platform/${platform.id}/region`);
+                pRegions = data.item || data || [];
+            } catch (err) {
+                continue;
+            }
+
+            if (pRegions.length < 2) continue;
+
+            // Create a temporary container for progress (hidden)
+            const tempProgress = document.createElement('div');
+            tempProgress.style.display = 'none';
+            document.body.appendChild(tempProgress);
+
+            const regionData = await fetchAllRegionData(platform.id, pRegions, tempProgress);
+            document.body.removeChild(tempProgress);
+
+            if (!regionData) continue;
+
+            const variations = buildVariations(regionData);
+            if (variations.length === 0) continue;
+
+            const allRegionNames = Object.keys(regionData);
+            const rows = variations.map(v => {
+                const mode = getMode(v.regionEpgs);
+                const row = {
+                    'Channel Name': v.title,
+                    'Coverage': `${v.presentCount}/${v.totalRegions}`,
+                    'Mode EPG': mode || '-'
+                };
+                allRegionNames.forEach(rName => {
+                    row[rName] = v.regionEpgs[rName] ? parseInt(v.regionEpgs[rName]) : '';
+                });
+                return row;
+            });
+
+            // Sheet name max 31 chars
+            let sheetName = pName.length > 31 ? pName.slice(0, 31) : pName;
+            // Ensure unique sheet name
+            const existingNames = wb.SheetNames || [];
+            if (existingNames.includes(sheetName)) {
+                sheetName = sheetName.slice(0, 28) + `(${sheetsAdded})`;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            sheetsAdded++;
+        }
+
+        progress.remove();
+
+        if (sheetsAdded === 0) {
+            API.toast('No platforms had variations to export.', 'warning');
+            return;
+        }
+
+        XLSX.writeFile(wb, 'EPG_Variations_All_Platforms.xlsx');
+        API.toast(`Excel file downloaded with ${sheetsAdded} platform sheet(s).`, 'success');
     }
 
     return { render };
