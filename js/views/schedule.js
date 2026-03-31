@@ -52,8 +52,7 @@ const ScheduleView = (() => {
         const hiddenId = document.getElementById('sch-channel-id');
 
         input.addEventListener('focus', () => {
-            // Only show dropdown on focus if there's already text typed
-            if (input.value.trim()) showDropdown();
+            input.select();
         });
         input.addEventListener('input', () => showDropdown());
 

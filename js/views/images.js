@@ -187,7 +187,7 @@ const ImagesView = (() => {
         const hiddenId = document.getElementById('img-channel-id');
 
         input.addEventListener('focus', () => {
-            if (input.value.trim()) showDropdown();
+            input.select();
         });
         input.addEventListener('input', () => showDropdown());
 
@@ -668,7 +668,7 @@ function getDateRange() {
         const input = document.getElementById('audit-channel-search');
         const dropdown = document.getElementById('audit-channel-dropdown');
 
-        input.addEventListener('focus', () => { if (input.value.trim()) showAuditDropdown(); });
+        input.addEventListener('focus', () => { input.select(); });
         input.addEventListener('input', () => showAuditDropdown());
 
         document.addEventListener('click', (e) => {
