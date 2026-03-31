@@ -110,11 +110,11 @@ const API = (() => {
             if (!m || !m.rendition) return;
             const rend = m.rendition;
             if (Array.isArray(rend)) {
-                rend.forEach(r => { if (r && r.href) images.push(r); });
+                rend.forEach(r => { if (r && r.href) images.push({ ...r, copyright: m.copyright || '' }); });
             } else if (typeof rend === 'object') {
                 // Keyed object: { "default": {href,...}, "16x9": {href,...} }
                 Object.entries(rend).forEach(([key, r]) => {
-                    if (r && r.href) images.push({ ...r, label: key });
+                    if (r && r.href) images.push({ ...r, label: key, copyright: m.copyright || '' });
                 });
             }
         });

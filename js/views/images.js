@@ -30,35 +30,7 @@ const ImagesView = (() => {
                         <div id="img-channel-dropdown" class="channel-dropdown"></div>
                         <input type="hidden" id="img-channel-id">
                     </div>
-                    <div class="form-group">
-                        <label>Start Date</label>
-                        <input type="date" id="img-start" class="input" style="min-width:160px" value="${today}">
-                    </div>
-                    <div class="form-group">
-                        <label>Date Range</label>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <select id="img-range-type" class="select" style="min-width:120px">
-                                <option value="days">Number of days</option>
-                                <option value="end">End date</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group" id="img-days-group">
-                        <label>Days</label>
-                        <select id="img-days" class="select" style="min-width:80px">
-                            <option value="1" selected>1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="5">5</option>
-                            <option value="7">7</option>
-                            <option value="14">14</option>
-                            <option value="21">21</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="img-end-group" style="display:none">
-                        <label>End Date</label>
-                        <input type="date" id="img-end" class="input" style="min-width:160px">
-                    </div>
+                    <input type="hidden" id="img-start" value="${today}">
                     <div class="form-group">
                         <label>&nbsp;</label>
                         <button id="img-load" class="btn btn-primary">Load Programmes</button>
@@ -115,7 +87,7 @@ const ImagesView = (() => {
                     </div>
                 </div>
                 <div id="audit-channel-browser" style="display:none;margin-bottom:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)">
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--color-border)">
+                    <div style="display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--color-border)">
                         <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">ALL CHANNELS</span>
                         <div style="display:flex;gap:8px;align-items:center">
                             <input type="text" id="audit-browser-search" class="input" placeholder="Filter..." style="width:180px;height:28px;font-size:12px;padding:2px 8px">
@@ -170,7 +142,6 @@ const ImagesView = (() => {
 
         // Schedule tab setup
         setupChannelSearch();
-        setupRangeToggle();
         document.getElementById('img-load').addEventListener('click', loadProgrammes);
         document.getElementById('img-filter-all').addEventListener('click', () => applyFilter('all'));
         document.getElementById('img-filter-with').addEventListener('click', () => applyFilter('with'));
@@ -262,48 +233,13 @@ const ImagesView = (() => {
         }
     }
 
-    function setupRangeToggle() {
-        const rangeType = document.getElementById('img-range-type');
-        const daysGroup = document.getElementById('img-days-group');
-        const endGroup = document.getElementById('img-end-group');
-
-        rangeType.addEventListener('change', () => {
-            if (rangeType.value === 'days') {
-                daysGroup.style.display = '';
-                endGroup.style.display = 'none';
-            } else {
-                daysGroup.style.display = 'none';
-                endGroup.style.display = '';
-            }
-        });
-    }
-
-    function getDateRange() {
+function getDateRange() {
         const start = document.getElementById('img-start').value;
         if (!start) return null;
 
-        const rangeType = document.getElementById('img-range-type').value;
-        let end;
-
-        if (rangeType === 'days') {
-            const days = parseInt(document.getElementById('img-days').value);
-            const endDate = new Date(start);
-            endDate.setDate(endDate.getDate() + days);
-            end = endDate.toISOString().slice(0, 10);
-        } else {
-            end = document.getElementById('img-end').value;
-            if (!end) return null;
-        }
-
-        const diffDays = (new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24);
-        if (diffDays > 21) {
-            API.toast('Date range cannot exceed 21 days.', 'warning');
-            return null;
-        }
-        if (diffDays <= 0) {
-            API.toast('End date must be after start date.', 'warning');
-            return null;
-        }
+        const endDate = new Date(start);
+        endDate.setDate(endDate.getDate() + 1);
+        const end = endDate.toISOString().slice(0, 10);
 
         return { start, end };
     }
@@ -352,13 +288,22 @@ const ImagesView = (() => {
         nav.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
                 <button id="img-prev-day" class="btn btn-sm btn-secondary">&larr; Previous Day</button>
-                <span style="font-weight:600;font-size:15px;min-width:260px;text-align:center">${API.escapeHtml(dateStr)}</span>
+                <div style="position:relative;display:inline-block">
+                    <span id="img-date-label" style="font-weight:600;font-size:15px;min-width:260px;text-align:center;display:inline-block;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px">${API.escapeHtml(dateStr)}</span>
+                    <input type="date" id="img-date-picker" value="${startDate}" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer">
+                </div>
                 <button id="img-next-day" class="btn btn-sm btn-secondary">Next Day &rarr;</button>
             </div>
         `;
 
         document.getElementById('img-prev-day').addEventListener('click', () => shiftImgDay(-1));
         document.getElementById('img-next-day').addEventListener('click', () => shiftImgDay(1));
+        document.getElementById('img-date-picker').addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('img-start').value = e.target.value;
+                loadProgrammes();
+            }
+        });
     }
 
     function shiftImgDay(offset) {
@@ -427,6 +372,7 @@ const ImagesView = (() => {
         items.forEach(item => {
             const images = getImages(item);
             const hasImages = images.length > 0;
+            const copyrights = [...new Set(images.map(img => img.copyright).filter(Boolean))];
             const dt = item.dateTime ? new Date(item.dateTime) : null;
             const time = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-';
             const date = dt ? dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
@@ -457,6 +403,11 @@ const ImagesView = (() => {
                                 : '<span class="badge badge-orange">No images</span>'}
                             ${asset.type ? `<span class="badge badge-purple">${API.escapeHtml(asset.type)}</span>` : ''}
                         </div>
+                        ${hasImages && copyrights.length > 0 ? `
+                            <div style="margin-top:6px;font-size:12px;color:var(--color-text-secondary)">
+                                <span style="font-weight:600">&copy;</span> ${copyrights.map(c => API.escapeHtml(c)).join(' \u00B7 ')}
+                            </div>
+                        ` : ''}
                         ${hasImages ? `
                             <div class="img-thumbs" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
                                 ${images.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:180px;max-height:120px;border-radius:4px;object-fit:cover;border:1px solid var(--color-border);cursor:pointer" alt="" onclick="event.stopPropagation()">`).join('')}
@@ -498,6 +449,7 @@ const ImagesView = (() => {
         container.appendChild(back);
 
         const images = getImages(item);
+        const copyrights = [...new Set(images.map(img => img.copyright).filter(Boolean))];
         const dt = item.dateTime ? new Date(item.dateTime) : null;
         const timeStr = dt ? dt.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
         const asset = item.asset || {};
@@ -516,6 +468,7 @@ const ImagesView = (() => {
             ${asset.id ? `<div class="detail-row"><div class="detail-label">Asset ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(asset.id)}</code></div></div>` : ''}
             ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
             ${certEntries ? `<div class="detail-row"><div class="detail-label">Certification</div><div class="detail-value">${API.escapeHtml(certEntries)}</div></div>` : ''}
+            ${copyrights.length > 0 ? `<div class="detail-row"><div class="detail-label">Copyright</div><div class="detail-value">${copyrights.map(c => API.escapeHtml(c)).join(', ')}</div></div>` : ''}
             ${summary.short ? `<div class="detail-row"><div class="detail-label">Summary</div><div class="detail-value">${API.escapeHtml(summary.short)}</div></div>` : ''}
             ${summary.medium ? `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">${API.escapeHtml(summary.medium)}</div></div>` : ''}
             ${summary.long ? `<div class="detail-row"><div class="detail-label">Full Description</div><div class="detail-value">${API.escapeHtml(summary.long)}</div></div>` : ''}
@@ -560,6 +513,7 @@ const ImagesView = (() => {
                 const parts = [];
                 if (img.label) parts.push(img.label);
                 if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
+                if (img.copyright) parts.push(`\u00A9 ${img.copyright}`);
                 meta.innerHTML = `
                     ${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}
                     <a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open in new tab</a>
@@ -1112,11 +1066,28 @@ const ImagesView = (() => {
             ${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, ${totals.with} with images (${totalPct}%), ${totals.without} missing
         </div>`;
 
+        const btnGroup = document.createElement('div');
+        btnGroup.style.cssText = 'display:flex;gap:8px';
+
+        if (totals.without > 0) {
+            const viewAllBtn = document.createElement('button');
+            viewAllBtn.className = 'btn btn-sm btn-secondary';
+            viewAllBtn.textContent = `View All Missing (${totals.without})`;
+            viewAllBtn.addEventListener('click', () => {
+                const panel = document.getElementById('audit-all-missing');
+                if (panel) { panel.remove(); viewAllBtn.textContent = `View All Missing (${totals.without})`; return; }
+                viewAllBtn.textContent = 'Hide All Missing';
+                renderAllMissing(container);
+            });
+            btnGroup.appendChild(viewAllBtn);
+        }
+
         const exportBtn = document.createElement('button');
         exportBtn.className = 'btn btn-sm btn-secondary';
         exportBtn.textContent = 'Export to Excel';
         exportBtn.addEventListener('click', exportAuditExcel);
-        header.appendChild(exportBtn);
+        btnGroup.appendChild(exportBtn);
+        header.appendChild(btnGroup);
         container.appendChild(header);
 
         // Results table
@@ -1222,6 +1193,44 @@ const ImagesView = (() => {
 
         wrapper.appendChild(miniTable);
         cell.appendChild(wrapper);
+    }
+
+    function renderAllMissing(container) {
+        const panel = document.createElement('div');
+        panel.id = 'audit-all-missing';
+        panel.style.cssText = 'margin-top:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);max-height:500px;overflow-y:auto;padding:12px 16px';
+
+        const allMissing = [];
+        auditResults.forEach(r => {
+            r.missingProgrammes.forEach(prog => {
+                allMissing.push({ channel: r.channelTitle, ...prog });
+            });
+        });
+
+        const heading = document.createElement('div');
+        heading.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px';
+        heading.textContent = `All Programmes Missing Images (${allMissing.length})`;
+        panel.appendChild(heading);
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.style.fontSize = '13px';
+        table.innerHTML = `<thead><tr><th>Channel</th><th>Programme</th><th>Date/Time</th><th>Asset ID</th></tr></thead><tbody></tbody>`;
+        const tbody = table.querySelector('tbody');
+
+        allMissing.forEach(prog => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${API.escapeHtml(prog.channel)}</strong></td>
+                <td>${API.escapeHtml(prog.title)}</td>
+                <td>${API.escapeHtml(prog.dateTime)}</td>
+                <td><code style="font-size:11px;user-select:all">${API.escapeHtml(prog.assetId)}</code></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        panel.appendChild(table);
+        container.appendChild(panel);
     }
 
     // --- Excel export ---
