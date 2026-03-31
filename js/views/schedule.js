@@ -17,7 +17,11 @@ const ScheduleView = (() => {
                 </div>
                 <div class="form-group">
                     <label>Date</label>
-                    <input type="date" id="sch-date" class="input" style="min-width:160px" value="${today}">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <button id="sch-prev-day" class="btn btn-sm btn-secondary">&larr;</button>
+                        <input type="date" id="sch-date" class="input" style="min-width:160px" value="${today}">
+                        <button id="sch-next-day" class="btn btn-sm btn-secondary">&rarr;</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>&nbsp;</label>
@@ -33,6 +37,8 @@ const ScheduleView = (() => {
         document.getElementById('sch-date').addEventListener('change', () => {
             if (document.getElementById('sch-channel-id').value) loadSchedule();
         });
+        document.getElementById('sch-prev-day').addEventListener('click', () => shiftDay(-1));
+        document.getElementById('sch-next-day').addEventListener('click', () => shiftDay(1));
 
         await loadAllChannels();
     }
@@ -107,6 +113,14 @@ const ScheduleView = (() => {
 
             dropdown.style.display = 'block';
         }
+    }
+
+    function shiftDay(offset) {
+        const dateInput = document.getElementById('sch-date');
+        const dt = new Date(dateInput.value);
+        dt.setDate(dt.getDate() + offset);
+        dateInput.value = dt.toISOString().slice(0, 10);
+        if (document.getElementById('sch-channel-id').value) loadSchedule();
     }
 
     async function loadSchedule() {
