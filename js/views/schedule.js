@@ -9,7 +9,7 @@ const ScheduleView = (() => {
                 <p>Pick a channel and date to view the full schedule. Click any programme for full details.</p>
             </div>
             <div class="filter-bar">
-                <div class="form-group" style="flex:1;min-width:250px">
+                <div class="form-group" style="min-width:300px;max-width:400px">
                     <label>Channel</label>
                     <input type="text" id="sch-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
                     <div id="sch-channel-dropdown" class="channel-dropdown"></div>
