@@ -9,6 +9,13 @@ const EpgView = (() => {
     let varRegionData = null;
     let varVariations = [];
 
+    // EPG sort: 1-3 digit numbers first, then 4+ digit numbers, ascending within each group
+    function epgSortKey(epgStr) {
+        const s = String(epgStr);
+        const group = s.length >= 4 ? 1 : 0;
+        return group * 1000000 + parseInt(s, 10);
+    }
+
     async function render(container) {
         container.innerHTML = `
             <div class="view-header">
@@ -147,9 +154,9 @@ const EpgView = (() => {
             const allItems = data.item || [];
             const hasRegions = regions.length > 0;
             epgChannels = hasRegions
-                ? allItems.filter(ch => ch.epg).sort((a, b) => parseInt(a.epg) - parseInt(b.epg))
+                ? allItems.filter(ch => ch.epg).sort((a, b) => epgSortKey(a.epg) - epgSortKey(b.epg))
                 : allItems.sort((a, b) => {
-                    if (a.epg && b.epg) return parseInt(a.epg) - parseInt(b.epg);
+                    if (a.epg && b.epg) return epgSortKey(a.epg) - epgSortKey(b.epg);
                     if (a.epg) return -1;
                     if (b.epg) return 1;
                     return (a.title || '').localeCompare(b.title || '');
@@ -320,7 +327,7 @@ const EpgView = (() => {
                     const data = await API.fetch('/channel', { platformId, regionId: r.id });
                     const channels = (data.item || [])
                         .filter(ch => ch.epg)
-                        .sort((a, b) => parseInt(a.epg) - parseInt(b.epg));
+                        .sort((a, b) => epgSortKey(a.epg) - epgSortKey(b.epg));
                     regionData[name] = channels;
                 } catch (err) {
                     regionData[name] = [];
@@ -390,10 +397,10 @@ const EpgView = (() => {
             }
         });
 
-        // Sort by ascending EPG number (lowest EPG across regions)
+        // Sort by ascending EPG number (lowest EPG across regions), 4+ digits after 1-3 digits
         variations.sort((a, b) => {
-            const aMin = Math.min(...Object.values(a.regionEpgs).map(Number));
-            const bMin = Math.min(...Object.values(b.regionEpgs).map(Number));
+            const aMin = Math.min(...Object.values(a.regionEpgs).map(e => epgSortKey(e)));
+            const bMin = Math.min(...Object.values(b.regionEpgs).map(e => epgSortKey(e)));
             return aMin - bMin;
         });
         return variations;
@@ -475,8 +482,8 @@ const EpgView = (() => {
                 });
 
                 const sorted = [...allChannels.values()].sort((a, b) => {
-                    const aMin = Math.min(...Object.values(a.regionEpgs).map(Number));
-                    const bMin = Math.min(...Object.values(b.regionEpgs).map(Number));
+                    const aMin = Math.min(...Object.values(a.regionEpgs).map(e => epgSortKey(e)));
+                    const bMin = Math.min(...Object.values(b.regionEpgs).map(e => epgSortKey(e)));
                     return aMin - bMin;
                 });
 
