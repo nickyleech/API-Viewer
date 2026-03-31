@@ -24,9 +24,9 @@ const ImagesView = (() => {
 
             <div id="tab-schedule" class="tab-panel">
                 <div class="filter-bar">
-                    <div class="form-group" style="min-width:250px;max-width:400px">
+                    <div class="form-group" style="min-width:300px;max-width:400px">
                         <label>Channel</label>
-                        <input type="text" id="img-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
+                        <input type="text" id="img-channel-search" class="input" placeholder="Type to search and add channels..." style="width:100%" autocomplete="off">
                         <div id="img-channel-dropdown" class="channel-dropdown"></div>
                         <input type="hidden" id="img-channel-id">
                     </div>
@@ -56,8 +56,8 @@ const ImagesView = (() => {
 
             <div id="tab-audit" class="tab-panel active">
                 <div class="filter-bar">
-                    <div class="form-group" style="flex:1;min-width:300px">
-                        <label>Add Channels</label>
+                    <div class="form-group" style="min-width:300px;max-width:400px">
+                        <label>Channel</label>
                         <input type="text" id="audit-channel-search" class="input" placeholder="Type to search and add channels..." style="width:100%" autocomplete="off">
                         <div id="audit-channel-dropdown" class="channel-dropdown"></div>
                     </div>
@@ -360,7 +360,8 @@ function getDateRange() {
             const images = getImages(item);
             const hasImages = images.length > 0;
             const episodeImages = images.filter(img => img.source === 'episode');
-            const seriesImages = images.filter(img => img.source !== 'episode');
+            const seriesImages = images.filter(img => img.source === 'series');
+            const seasonImages = images.filter(img => img.source === 'season');
             const copyrights = [...new Set(images.map(img => img.copyright).filter(Boolean))];
             const dt = item.dateTime ? new Date(item.dateTime) : null;
             const time = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-';
@@ -379,6 +380,7 @@ function getDateRange() {
             const imageBadges = [];
             if (episodeImages.length > 0) imageBadges.push(`<span class="badge badge-green">${episodeImages.length} episode</span>`);
             if (seriesImages.length > 0) imageBadges.push(`<span class="badge badge-green">${seriesImages.length} series</span>`);
+            if (seasonImages.length > 0) imageBadges.push(`<span class="badge badge-green">${seasonImages.length} season</span>`);
 
             card.innerHTML = `
                 <div style="display:flex;gap:16px;align-items:start">
@@ -499,18 +501,36 @@ function getDateRange() {
                 groups[key].push(img);
             });
 
-            const groupOrder = ['episode', 'series'];
+            const groupOrder = ['episode', 'series', 'season'];
             const sortedKeys = Object.keys(groups).sort((a, b) => {
                 const ai = groupOrder.indexOf(a);
                 const bi = groupOrder.indexOf(b);
                 return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
             });
 
+            // Jump navigation when multiple groups exist
+            if (sortedKeys.length > 1) {
+                const nav = document.createElement('div');
+                nav.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px';
+                sortedKeys.forEach(key => {
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-sm btn-secondary';
+                    btn.textContent = `${label} (${groups[key].length})`;
+                    btn.addEventListener('click', () => {
+                        document.getElementById(`img-group-${key}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                    nav.appendChild(btn);
+                });
+                gallerySection.appendChild(nav);
+            }
+
             sortedKeys.forEach(key => {
                 const groupImages = groups[key];
                 const label = key.charAt(0).toUpperCase() + key.slice(1);
 
                 const heading = document.createElement('h3');
+                heading.id = `img-group-${key}`;
                 heading.style.cssText = 'margin:16px 0 12px';
                 heading.textContent = `${label} Images (${groupImages.length})`;
                 gallerySection.appendChild(heading);
