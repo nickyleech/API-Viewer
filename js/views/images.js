@@ -5,12 +5,6 @@ const ImagesView = (() => {
     let savedListView = null;
     let currentFilter = 'all';
 
-    // === Programme tab state ===
-    let catalogues = [];
-    let programmeResults = [];
-    let savedProgrammeView = null;
-    let currentCatalogueId = '';
-
     // === Audit tab state ===
     let auditSelectedChannels = [];
     let auditResults = [];
@@ -24,12 +18,11 @@ const ImagesView = (() => {
                 <p>Browse programme images by schedule or search for a programme by name.</p>
             </div>
             <div class="view-tabs">
-                <button class="view-tab active" data-tab="schedule">By Schedule</button>
-                <button class="view-tab" data-tab="programme">By Programme</button>
-                <button class="view-tab" data-tab="audit">Image Audit</button>
+                <button class="view-tab active" data-tab="audit">Image Audit</button>
+                <button class="view-tab" data-tab="schedule">By Schedule</button>
             </div>
 
-            <div id="tab-schedule" class="tab-panel active">
+            <div id="tab-schedule" class="tab-panel">
                 <div class="filter-bar">
                     <div class="form-group" style="flex:1;min-width:250px">
                         <label>Channel</label>
@@ -83,32 +76,27 @@ const ImagesView = (() => {
                 <div id="img-results"></div>
             </div>
 
-            <div id="tab-programme" class="tab-panel">
-                <div class="filter-bar">
-                    <div class="form-group">
-                        <label>Catalogue</label>
-                        <select id="prog-catalogue" class="select" style="min-width:200px">
-                            <option value="">Loading...</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex:1;min-width:250px">
-                        <label>Programme Name</label>
-                        <input type="text" id="prog-title" class="input" placeholder="e.g. Coronation Street, Peppa Pig..." style="width:100%">
-                    </div>
-                    <div class="form-group">
-                        <label>&nbsp;</label>
-                        <button id="prog-search" class="btn btn-primary">Search</button>
-                    </div>
-                </div>
-                <div id="prog-results"></div>
-            </div>
-
-            <div id="tab-audit" class="tab-panel">
+            <div id="tab-audit" class="tab-panel active">
                 <div class="filter-bar">
                     <div class="form-group" style="flex:1;min-width:300px">
                         <label>Add Channels</label>
                         <input type="text" id="audit-channel-search" class="input" placeholder="Type to search and add channels..." style="width:100%" autocomplete="off">
                         <div id="audit-channel-dropdown" class="channel-dropdown"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Channel Type</label>
+                        <div style="display:flex;gap:12px;align-items:center;height:36px">
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:400;font-size:13px">
+                                <input type="checkbox" id="audit-filter-tv" checked> TV
+                            </label>
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:400;font-size:13px">
+                                <input type="checkbox" id="audit-filter-radio" checked> Radio
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="audit-browse-all" class="btn btn-sm btn-secondary">Browse All Channels</button>
                     </div>
                     <div class="form-group">
                         <label>Saved Lists</label>
@@ -124,6 +112,17 @@ const ImagesView = (() => {
                             <button id="audit-delete-list" class="btn btn-sm btn-secondary">Delete</button>
                         </div>
                     </div>
+                </div>
+                <div id="audit-channel-browser" style="display:none;margin-bottom:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--color-border)">
+                        <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">ALL CHANNELS</span>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="text" id="audit-browser-search" class="input" placeholder="Filter..." style="width:180px;height:28px;font-size:12px;padding:2px 8px">
+                            <button id="audit-select-all-visible" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Select All Visible</button>
+                            <button id="audit-browser-close" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Close</button>
+                        </div>
+                    </div>
+                    <div id="audit-browser-list" style="max-height:300px;overflow-y:auto;padding:8px 14px"></div>
                 </div>
                 <div id="audit-selected-chips" style="display:none;margin-bottom:16px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -176,17 +175,11 @@ const ImagesView = (() => {
         document.getElementById('img-filter-with').addEventListener('click', () => applyFilter('with'));
         document.getElementById('img-filter-without').addEventListener('click', () => applyFilter('without'));
 
-        // Programme tab setup
-        document.getElementById('prog-search').addEventListener('click', searchProgrammes);
-        document.getElementById('prog-title').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') searchProgrammes();
-        });
-
         // Audit tab setup
         setupAuditTab();
 
-        // Load data for all tabs in parallel
-        await Promise.all([loadAllChannels(), loadCatalogues()]);
+        // Load data
+        await loadAllChannels();
     }
 
     // ============================================================
@@ -533,619 +526,6 @@ const ImagesView = (() => {
     }
 
     // ============================================================
-    // PROGRAMME TAB — new functionality
-    // ============================================================
-
-    async function loadCatalogues() {
-        const sel = document.getElementById('prog-catalogue');
-        try {
-            const data = await API.fetch('/catalogue');
-            catalogues = data.item || data.items || [];
-            sel.innerHTML = '';
-            catalogues.forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat.id;
-                opt.textContent = cat.name || cat.title || cat.id;
-                sel.appendChild(opt);
-            });
-            if (catalogues.length === 0) {
-                sel.innerHTML = '<option value="">No catalogues available</option>';
-            }
-        } catch (err) {
-            sel.innerHTML = '<option value="">Error loading catalogues</option>';
-        }
-    }
-
-    // Extract type from catalogue asset - may be at top level or nested in .asset
-    function getAssetType(item) {
-        return item.type || (item.asset && item.asset.type) || '';
-    }
-
-    // Extract the actual asset ID - may be at top level or nested in .asset
-    function getAssetId(item) {
-        return item.id || (item.asset && item.asset.id) || '';
-    }
-
-    async function searchProgrammes() {
-        const results = document.getElementById('prog-results');
-        const catalogueId = document.getElementById('prog-catalogue').value;
-        const title = document.getElementById('prog-title').value.trim();
-
-        if (!catalogueId) {
-            API.toast('Please select a catalogue.', 'warning');
-            return;
-        }
-        if (!title) {
-            API.toast('Please enter a programme name.', 'warning');
-            return;
-        }
-
-        currentCatalogueId = catalogueId;
-        API.showLoading(results);
-        try {
-            const data = await API.fetch(`/catalogue/${catalogueId}/asset`, { title, limit: 50 });
-            const basicItems = data.item || [];
-            if (basicItems.length === 0) {
-                API.showEmpty(results, 'No programmes found matching your search.');
-                return;
-            }
-
-            // Fetch full details for each result to get type, season/episode info
-            results.innerHTML = '';
-            const progress = document.createElement('div');
-            progress.className = 'results-info';
-            progress.textContent = `Loading details for ${basicItems.length} result(s)...`;
-            results.appendChild(progress);
-
-            const fullItems = [];
-            for (let i = 0; i < basicItems.length; i += 5) {
-                const batch = basicItems.slice(i, i + 5);
-                const batchResults = await Promise.all(
-                    batch.map(item => {
-                        const id = getAssetId(item);
-                        return API.fetch(`/catalogue/${catalogueId}/asset/${id}`).catch(() => item);
-                    })
-                );
-                fullItems.push(...batchResults);
-                progress.textContent = `Loaded ${Math.min(i + 5, basicItems.length)} of ${basicItems.length} result(s)...`;
-            }
-
-            programmeResults = fullItems;
-            renderProgrammeResults(results, fullItems);
-        } catch (err) {
-            programmeResults = [];
-            API.showError(results, err.message);
-        }
-    }
-
-    function renderProgrammeResults(container, items) {
-        container.innerHTML = '';
-
-        if (items.length === 0) {
-            API.showEmpty(container, 'No programmes found matching your search.');
-            return;
-        }
-
-        // Now we have full details — group by type
-        const seriesItems = items.filter(a => a.type === 'series');
-        const movieItems = items.filter(a => a.type === 'movie');
-        const episodeItems = items.filter(a => a.type === 'episode');
-        const otherItems = items.filter(a => !['series', 'movie', 'episode'].includes(a.type || ''));
-
-        const info = document.createElement('div');
-        info.className = 'results-info';
-        info.textContent = `${items.length} result(s)`;
-        container.appendChild(info);
-
-        // Render series (clickable to drill down)
-        if (seriesItems.length > 0) {
-            renderAssetGroup(container, 'Series', seriesItems, 'series');
-        }
-
-        // Render movies
-        if (movieItems.length > 0) {
-            renderAssetGroup(container, 'Movies', movieItems, 'movie');
-        }
-
-        // Render episodes grouped by season
-        if (episodeItems.length > 0) {
-            renderEpisodesBySeason(container, episodeItems);
-        }
-
-        // Render other
-        if (otherItems.length > 0) {
-            renderAssetGroup(container, 'Other', otherItems, 'other');
-        }
-    }
-
-    function renderAssetGroup(container, label, items, groupType) {
-        const heading = document.createElement('h3');
-        heading.style.cssText = 'margin:16px 0 8px;font-size:16px;';
-        heading.textContent = `${label} (${items.length})`;
-        container.appendChild(heading);
-
-        items.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'card clickable';
-
-            const typeColors = { movie: 'badge-orange', episode: 'badge-blue', series: 'badge-purple', season: 'badge-green' };
-            const typeBadge = `<span class="badge ${typeColors[item.type] || 'badge-gray'}">${API.escapeHtml(item.type || 'unknown')}</span>`;
-            const summary = item.summary || {};
-            const imgs = API.extractImages(item.media);
-
-            card.innerHTML = `
-                <div style="display:flex;gap:12px;align-items:start">
-                    ${imgs.length > 0 ? `<img src="${API.escapeHtml(imgs[0].href)}" class="thumb" alt="">` : ''}
-                    <div style="flex:1">
-                        <div class="card-title">${API.escapeHtml(item.title || 'Untitled')}</div>
-                        <div class="card-meta">
-                            ${typeBadge}
-                            ${item.productionYear ? `<span class="badge badge-gray">${item.productionYear}</span>` : ''}
-                            ${imgs.length > 0 ? `<span class="badge badge-green">${imgs.length} image(s)</span>` : ''}
-                        </div>
-                        ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
-                    </div>
-                </div>
-            `;
-
-            if (item.type === 'series') {
-                card.addEventListener('click', () => showSeriesDetail(item));
-            } else {
-                card.addEventListener('click', () => showAssetImageDetail(item));
-            }
-            container.appendChild(card);
-        });
-    }
-
-    function renderEpisodesBySeason(container, episodes) {
-        // Group episodes by their parent season (from related links)
-        const seasonMap = new Map();
-        const noSeason = [];
-
-        episodes.forEach(ep => {
-            const seasonRel = (ep.related || []).find(r => r.type === 'season');
-            if (seasonRel) {
-                if (!seasonMap.has(seasonRel.id)) {
-                    seasonMap.set(seasonRel.id, { id: seasonRel.id, episodes: [] });
-                }
-                seasonMap.get(seasonRel.id).episodes.push(ep);
-            } else {
-                noSeason.push(ep);
-            }
-        });
-
-        const heading = document.createElement('h3');
-        heading.style.cssText = 'margin:16px 0 8px;font-size:16px;';
-        heading.textContent = `Episodes (${episodes.length})`;
-        container.appendChild(heading);
-
-        // Sort seasons - try to determine season number from episode data
-        const seasonGroups = [...seasonMap.values()];
-        seasonGroups.forEach(sg => {
-            // Try to extract season number from episode titles or seasonNumber field
-            sg.seasonNum = Infinity;
-            sg.episodes.forEach(ep => {
-                const num = ep.seasonNumber || ep.seriesNumber;
-                if (num && num < sg.seasonNum) sg.seasonNum = num;
-            });
-            if (sg.seasonNum === Infinity) {
-                // Try to extract from related season title patterns
-                const match = (sg.episodes[0]?.title || '').match(/S(\d+)/i);
-                sg.seasonNum = match ? parseInt(match[1]) : 999;
-            }
-        });
-        seasonGroups.sort((a, b) => a.seasonNum - b.seasonNum);
-
-        // Render each season as an accordion
-        seasonGroups.forEach(sg => {
-            // Sort episodes within season
-            sg.episodes.sort((a, b) => {
-                const numA = a.episodeNumber || parseInt((a.title || '').match(/(?:Ep(?:isode)?\.?\s*)(\d+)/i)?.[1]) || parseInt((a.title || '').match(/\d+/)?.[0]) || 0;
-                const numB = b.episodeNumber || parseInt((b.title || '').match(/(?:Ep(?:isode)?\.?\s*)(\d+)/i)?.[1]) || parseInt((b.title || '').match(/\d+/)?.[0]) || 0;
-                return numA - numB;
-            });
-
-            const seasonLabel = sg.seasonNum < 999 ? `Season ${sg.seasonNum}` : 'Unknown Season';
-            const imgCount = sg.episodes.reduce((sum, ep) => sum + API.extractImages(ep.media).length, 0);
-
-            const wrapper = document.createElement('div');
-            wrapper.style.marginBottom = '4px';
-
-            const header = document.createElement('div');
-            header.className = 'season-header';
-            header.innerHTML = `
-                <h4>
-                    ${API.escapeHtml(seasonLabel)}
-                    <span class="badge badge-gray" style="margin-left:8px">${sg.episodes.length} episode(s)</span>
-                    ${imgCount > 0 ? `<span class="badge badge-green" style="margin-left:4px">${imgCount} image(s)</span>` : ''}
-                </h4>
-                <span class="season-toggle">\u25BC</span>
-            `;
-
-            const episodesPanel = document.createElement('div');
-            episodesPanel.className = 'season-episodes';
-
-            // Render episode cards inside the panel
-            sg.episodes.forEach(ep => {
-                renderEpisodeCard(episodesPanel, ep);
-            });
-
-            header.addEventListener('click', () => {
-                episodesPanel.classList.toggle('open');
-                header.querySelector('.season-toggle').classList.toggle('open');
-            });
-
-            wrapper.appendChild(header);
-            wrapper.appendChild(episodesPanel);
-            container.appendChild(wrapper);
-        });
-
-        // Episodes with no season
-        if (noSeason.length > 0) {
-            const wrapper = document.createElement('div');
-            wrapper.style.marginBottom = '4px';
-
-            const header = document.createElement('div');
-            header.className = 'season-header';
-            header.innerHTML = `
-                <h4>Unsorted Episodes <span class="badge badge-gray" style="margin-left:8px">${noSeason.length} episode(s)</span></h4>
-                <span class="season-toggle">\u25BC</span>
-            `;
-
-            const episodesPanel = document.createElement('div');
-            episodesPanel.className = 'season-episodes';
-
-            noSeason.forEach(ep => {
-                renderEpisodeCard(episodesPanel, ep);
-            });
-
-            header.addEventListener('click', () => {
-                episodesPanel.classList.toggle('open');
-                header.querySelector('.season-toggle').classList.toggle('open');
-            });
-
-            wrapper.appendChild(header);
-            wrapper.appendChild(episodesPanel);
-            container.appendChild(wrapper);
-        }
-    }
-
-    function renderEpisodeCard(container, ep) {
-        const epImgs = API.extractImages(ep.media);
-        const summary = ep.summary || {};
-        const epNum = ep.episodeNumber;
-
-        const card = document.createElement('div');
-        card.className = 'card clickable';
-        card.style.marginBottom = '8px';
-
-        card.innerHTML = `
-            <div style="display:flex;gap:12px;align-items:start">
-                ${epImgs.length > 0 ? `<img src="${API.escapeHtml(epImgs[0].href)}" class="thumb" alt="">` : ''}
-                <div style="flex:1">
-                    <div class="card-title">
-                        ${epNum ? `<span style="color:var(--color-accent);font-weight:700">Ep ${epNum}</span> \u2014 ` : ''}${API.escapeHtml(ep.title || 'Untitled')}
-                    </div>
-                    <div class="card-meta">
-                        <span class="badge badge-blue">episode</span>
-                        ${ep.productionYear ? `<span class="badge badge-gray">${ep.productionYear}</span>` : ''}
-                        ${epImgs.length > 0 ? `<span class="badge badge-green">${epImgs.length} image(s)</span>` : '<span class="badge badge-orange">No images</span>'}
-                    </div>
-                    ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
-                </div>
-            </div>
-        `;
-
-        card.addEventListener('click', () => showAssetImageDetail(ep));
-        container.appendChild(card);
-    }
-
-    function restoreProgrammeView() {
-        const container = document.getElementById('content');
-        if (savedProgrammeView) {
-            container.innerHTML = '';
-            container.appendChild(savedProgrammeView);
-            savedProgrammeView = null;
-        } else {
-            render(container);
-        }
-    }
-
-    async function showSeriesDetail(seriesItem) {
-        const container = document.getElementById('content');
-        const assetId = getAssetId(seriesItem);
-
-        // Save current view
-        savedProgrammeView = document.createDocumentFragment();
-        while (container.firstChild) {
-            savedProgrammeView.appendChild(container.firstChild);
-        }
-
-        const back = document.createElement('a');
-        back.className = 'back-link';
-        back.innerHTML = '&larr; Back to Search Results';
-        back.addEventListener('click', () => restoreProgrammeView());
-        container.appendChild(back);
-
-        // Series header
-        const panel = document.createElement('div');
-        panel.className = 'detail-panel';
-        container.appendChild(panel);
-
-        API.showLoading(panel);
-
-        try {
-            // Fetch full series detail via catalogue endpoint
-            const series = await API.fetch(`/catalogue/${currentCatalogueId}/asset/${assetId}`);
-            const summary = series.summary || {};
-            const cats = (series.category || []).map(c => c.name).join(', ');
-            const seriesImgs = API.extractImages(series.media);
-
-            panel.innerHTML = `
-                <h3>${API.escapeHtml(series.title || 'Untitled')}</h3>
-                <div class="detail-row"><div class="detail-label">ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(series.id)}</code></div></div>
-                <div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(series.type || '')}</span></div></div>
-                ${series.productionYear ? `<div class="detail-row"><div class="detail-label">Year</div><div class="detail-value">${series.productionYear}</div></div>` : ''}
-                ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
-                ${summary.short ? `<div class="detail-row"><div class="detail-label">Summary</div><div class="detail-value">${API.escapeHtml(summary.short)}</div></div>` : ''}
-                ${summary.medium ? `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">${API.escapeHtml(summary.medium)}</div></div>` : ''}
-            `;
-
-            // Series images
-            if (seriesImgs.length > 0) {
-                const mediaRow = document.createElement('div');
-                mediaRow.className = 'detail-row';
-                mediaRow.innerHTML = `<div class="detail-label">Series Images</div><div class="detail-value">${
-                    seriesImgs.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:200px;height:auto;margin:4px;border-radius:4px;cursor:pointer" alt="">`).join('')
-                }</div>`;
-                mediaRow.querySelectorAll('img').forEach((img, i) => {
-                    img.addEventListener('click', () => openLightbox(seriesImgs[i].href, series.title));
-                });
-                panel.appendChild(mediaRow);
-            }
-
-            panel.appendChild(API.jsonToggle(series));
-
-            // Find related seasons
-            const relatedSeasons = (series.related || []).filter(r => r.type === 'season');
-
-            if (relatedSeasons.length === 0) {
-                const noSeasons = document.createElement('div');
-                noSeasons.className = 'detail-panel';
-                noSeasons.style.marginTop = '16px';
-                noSeasons.innerHTML = '<p style="color:var(--color-text-secondary)">No seasons found for this series.</p>';
-                container.appendChild(noSeasons);
-                return;
-            }
-
-            // Progress indicator
-            const progress = document.createElement('div');
-            progress.className = 'results-info';
-            progress.textContent = `Loading ${relatedSeasons.length} season(s)...`;
-            container.appendChild(progress);
-
-            // Fetch seasons in batches of 5 via catalogue endpoint
-            const seasons = [];
-            for (let i = 0; i < relatedSeasons.length; i += 5) {
-                const batch = relatedSeasons.slice(i, i + 5);
-                const batchResults = await Promise.all(
-                    batch.map(r => API.fetch(`/catalogue/${currentCatalogueId}/asset/${r.id}`).catch(() => null))
-                );
-                batchResults.forEach(s => { if (s) seasons.push(s); });
-                progress.textContent = `Loaded ${Math.min(i + 5, relatedSeasons.length)} of ${relatedSeasons.length} season(s)...`;
-            }
-
-            // Sort seasons by title (Season 1, Season 2, etc.)
-            seasons.sort((a, b) => {
-                const numA = parseInt((a.title || '').match(/\d+/)?.[0]) || 0;
-                const numB = parseInt((b.title || '').match(/\d+/)?.[0]) || 0;
-                return numA - numB;
-            });
-
-            progress.textContent = `${seasons.length} season(s)`;
-
-            // Render season accordions
-            const seasonsContainer = document.createElement('div');
-            seasonsContainer.style.marginTop = '8px';
-            container.appendChild(seasonsContainer);
-
-            seasons.forEach(season => {
-                const seasonImgs = API.extractImages(season.media);
-                const relatedEpisodes = (season.related || []).filter(r => r.type === 'episode');
-
-                const wrapper = document.createElement('div');
-                wrapper.style.marginBottom = '4px';
-
-                const header = document.createElement('div');
-                header.className = 'season-header';
-                header.innerHTML = `
-                    <h4>
-                        ${API.escapeHtml(season.title || 'Unnamed Season')}
-                        ${seasonImgs.length > 0 ? `<span class="badge badge-green" style="margin-left:8px">${seasonImgs.length} img</span>` : ''}
-                        <span class="badge badge-gray" style="margin-left:4px">${relatedEpisodes.length} episode(s)</span>
-                    </h4>
-                    <span class="season-toggle">\u25BC</span>
-                `;
-
-                const episodesPanel = document.createElement('div');
-                episodesPanel.className = 'season-episodes';
-
-                let episodesLoaded = false;
-
-                header.addEventListener('click', async () => {
-                    const isOpen = episodesPanel.classList.contains('open');
-                    episodesPanel.classList.toggle('open');
-                    header.querySelector('.season-toggle').classList.toggle('open');
-
-                    if (!isOpen && !episodesLoaded) {
-                        episodesLoaded = true;
-                        await loadSeasonEpisodes(episodesPanel, season, seasonImgs, relatedEpisodes);
-                    }
-                });
-
-                wrapper.appendChild(header);
-                wrapper.appendChild(episodesPanel);
-                seasonsContainer.appendChild(wrapper);
-            });
-
-        } catch (err) {
-            API.showError(panel, err.message);
-        }
-    }
-
-    async function loadSeasonEpisodes(container, season, seasonImgs, relatedEpisodes) {
-        API.showLoading(container);
-
-        // Show season images first
-        if (seasonImgs.length > 0) {
-            const seasonImgSection = document.createElement('div');
-            seasonImgSection.style.cssText = 'margin:12px 0 16px;';
-            seasonImgSection.innerHTML = `<h4 style="margin:0 0 8px;font-size:14px;">Season Images (${seasonImgs.length})</h4>`;
-            const gallery = document.createElement('div');
-            gallery.className = 'img-gallery';
-            seasonImgs.forEach(img => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'img-gallery-item';
-                const imgEl = document.createElement('img');
-                imgEl.src = img.href;
-                imgEl.alt = season.title || '';
-                imgEl.className = 'img-gallery-img';
-                imgEl.addEventListener('click', () => openLightbox(img.href, season.title));
-                wrapper.appendChild(imgEl);
-                const meta = document.createElement('div');
-                meta.className = 'img-gallery-meta';
-                const parts = [];
-                if (img.label) parts.push(img.label);
-                if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
-                meta.innerHTML = `${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}<a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open</a>`;
-                wrapper.appendChild(meta);
-                gallery.appendChild(wrapper);
-            });
-            seasonImgSection.appendChild(gallery);
-            container.innerHTML = '';
-            container.appendChild(seasonImgSection);
-        } else {
-            container.innerHTML = '';
-        }
-
-        if (relatedEpisodes.length === 0) {
-            const noEp = document.createElement('p');
-            noEp.style.cssText = 'color:var(--color-text-secondary);margin:8px 0;';
-            noEp.textContent = 'No episodes found for this season.';
-            container.appendChild(noEp);
-            return;
-        }
-
-        const epProgress = document.createElement('div');
-        epProgress.className = 'results-info';
-        epProgress.textContent = `Loading ${relatedEpisodes.length} episode(s)...`;
-        container.appendChild(epProgress);
-
-        // Fetch episodes in batches of 5 via catalogue endpoint
-        const episodes = [];
-        for (let i = 0; i < relatedEpisodes.length; i += 5) {
-            const batch = relatedEpisodes.slice(i, i + 5);
-            const batchResults = await Promise.all(
-                batch.map(r => API.fetch(`/catalogue/${currentCatalogueId}/asset/${r.id}`).catch(() => null))
-            );
-            batchResults.forEach(ep => { if (ep) episodes.push(ep); });
-            epProgress.textContent = `Loaded ${Math.min(i + 5, relatedEpisodes.length)} of ${relatedEpisodes.length} episode(s)...`;
-        }
-
-        // Sort episodes by episode number or title
-        episodes.sort((a, b) => {
-            const numA = parseInt((a.title || '').match(/\d+/)?.[0]) || 0;
-            const numB = parseInt((b.title || '').match(/\d+/)?.[0]) || 0;
-            return numA - numB;
-        });
-
-        epProgress.textContent = `${episodes.length} episode(s)`;
-
-        // Render episode cards
-        episodes.forEach(ep => {
-            const epImgs = API.extractImages(ep.media);
-            const summary = ep.summary || {};
-
-            const card = document.createElement('div');
-            card.className = 'card clickable';
-            card.style.marginBottom = '8px';
-
-            card.innerHTML = `
-                <div style="display:flex;gap:12px;align-items:start">
-                    ${epImgs.length > 0 ? `<img src="${API.escapeHtml(epImgs[0].href)}" class="thumb" alt="">` : ''}
-                    <div style="flex:1">
-                        <div class="card-title">${API.escapeHtml(ep.title || 'Untitled')}</div>
-                        <div class="card-meta">
-                            <span class="badge badge-blue">episode</span>
-                            ${ep.productionYear ? `<span class="badge badge-gray">${ep.productionYear}</span>` : ''}
-                            ${epImgs.length > 0 ? `<span class="badge badge-green">${epImgs.length} image(s)</span>` : '<span class="badge badge-orange">No images</span>'}
-                        </div>
-                        ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
-                    </div>
-                </div>
-            `;
-
-            card.addEventListener('click', () => showAssetImageDetail(ep));
-            container.appendChild(card);
-        });
-    }
-
-    async function showAssetImageDetail(item) {
-        const container = document.getElementById('content');
-        const assetId = getAssetId(item);
-
-        // Save current view
-        if (!savedProgrammeView) {
-            savedProgrammeView = document.createDocumentFragment();
-            while (container.firstChild) {
-                savedProgrammeView.appendChild(container.firstChild);
-            }
-        }
-
-        container.innerHTML = '';
-
-        const back = document.createElement('a');
-        back.className = 'back-link';
-        back.innerHTML = '&larr; Back';
-        back.addEventListener('click', () => restoreProgrammeView());
-        container.appendChild(back);
-
-        const panel = document.createElement('div');
-        panel.className = 'detail-panel';
-        API.showLoading(panel);
-        container.appendChild(panel);
-
-        try {
-            // Fetch full asset detail via catalogue endpoint
-            const fullAsset = await API.fetch(`/catalogue/${currentCatalogueId}/asset/${assetId}`);
-            const summary = fullAsset.summary || {};
-            const cats = (fullAsset.category || []).map(c => c.name).join(', ');
-            const attrs = (fullAsset.attribute || []).join(', ');
-            const images = API.extractImages(fullAsset.media);
-
-            panel.innerHTML = `
-                <h3>${API.escapeHtml(fullAsset.title || 'Untitled')}</h3>
-                <div class="detail-row"><div class="detail-label">ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(fullAsset.id)}</code></div></div>
-                <div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(fullAsset.type || '')}</span></div></div>
-                ${fullAsset.productionYear ? `<div class="detail-row"><div class="detail-label">Year</div><div class="detail-value">${fullAsset.productionYear}</div></div>` : ''}
-                ${fullAsset.runtime ? `<div class="detail-row"><div class="detail-label">Runtime</div><div class="detail-value">${fullAsset.runtime} min</div></div>` : ''}
-                ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
-                ${attrs ? `<div class="detail-row"><div class="detail-label">Attributes</div><div class="detail-value">${API.escapeHtml(attrs)}</div></div>` : ''}
-                ${summary.short ? `<div class="detail-row"><div class="detail-label">Summary</div><div class="detail-value">${API.escapeHtml(summary.short)}</div></div>` : ''}
-                ${summary.medium ? `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">${API.escapeHtml(summary.medium)}</div></div>` : ''}
-                ${summary.long ? `<div class="detail-row"><div class="detail-label">Full Description</div><div class="detail-value">${API.escapeHtml(summary.long)}</div></div>` : ''}
-            `;
-
-            panel.appendChild(API.jsonToggle(fullAsset));
-
-            renderImageGallery(container, images, fullAsset.title);
-
-        } catch (err) {
-            API.showError(panel, err.message);
-        }
-    }
-
-    // ============================================================
     // SHARED HELPERS
     // ============================================================
 
@@ -1231,6 +611,18 @@ const ImagesView = (() => {
             auditSelectedChannels = [];
             renderSelectedChips();
         });
+
+        // TV/Radio filter checkboxes
+        document.getElementById('audit-filter-tv').addEventListener('change', () => renderChannelBrowser());
+        document.getElementById('audit-filter-radio').addEventListener('change', () => renderChannelBrowser());
+
+        // Browse All Channels
+        document.getElementById('audit-browse-all').addEventListener('click', toggleChannelBrowser);
+        document.getElementById('audit-browser-close').addEventListener('click', () => {
+            document.getElementById('audit-channel-browser').style.display = 'none';
+        });
+        document.getElementById('audit-browser-search').addEventListener('input', () => renderChannelBrowser());
+        document.getElementById('audit-select-all-visible').addEventListener('click', selectAllVisibleChannels);
     }
 
     function setupAuditChannelSearch() {
@@ -1261,7 +653,8 @@ const ImagesView = (() => {
         }
 
         const selectedIds = new Set(auditSelectedChannels.map(ch => ch.id));
-        const filtered = allChannels.filter(ch =>
+        const typeFiltered = getTypeFilteredChannels();
+        const filtered = typeFiltered.filter(ch =>
             !selectedIds.has(ch.id) && (ch.title || '').toLowerCase().includes(query)
         );
 
@@ -1295,6 +688,90 @@ const ImagesView = (() => {
         dropdown.style.display = 'block';
     }
 
+    // --- Channel type helpers ---
+
+    function isRadioChannel(ch) {
+        return (ch.attribute || []).includes('radio');
+    }
+
+    function getTypeFilteredChannels() {
+        const showTv = document.getElementById('audit-filter-tv').checked;
+        const showRadio = document.getElementById('audit-filter-radio').checked;
+        return allChannels.filter(ch => {
+            const radio = isRadioChannel(ch);
+            return (radio && showRadio) || (!radio && showTv);
+        });
+    }
+
+    // --- Channel browser ---
+
+    function toggleChannelBrowser() {
+        const browser = document.getElementById('audit-channel-browser');
+        const isVisible = browser.style.display !== 'none';
+        if (isVisible) {
+            browser.style.display = 'none';
+        } else {
+            browser.style.display = '';
+            renderChannelBrowser();
+        }
+    }
+
+    function renderChannelBrowser() {
+        const browser = document.getElementById('audit-channel-browser');
+        if (browser.style.display === 'none') return;
+
+        const listDiv = document.getElementById('audit-browser-list');
+        const searchQuery = (document.getElementById('audit-browser-search').value || '').toLowerCase().trim();
+        const filtered = getTypeFilteredChannels();
+        const selectedIds = new Set(auditSelectedChannels.map(ch => ch.id));
+
+        const matched = searchQuery
+            ? filtered.filter(ch => (ch.title || '').toLowerCase().includes(searchQuery))
+            : filtered;
+
+        if (matched.length === 0) {
+            listDiv.innerHTML = '<div style="padding:12px;color:var(--color-text-secondary);font-size:13px">No channels match the current filters.</div>';
+            return;
+        }
+
+        listDiv.innerHTML = '';
+        matched.forEach(ch => {
+            const row = document.createElement('label');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px';
+            const isRadio = isRadioChannel(ch);
+            const badge = isRadio
+                ? '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#7c3aed;color:#fff;margin-left:4px">Radio</span>'
+                : '';
+            row.innerHTML = `
+                <input type="checkbox" data-channel-id="${API.escapeHtml(ch.id)}" ${selectedIds.has(ch.id) ? 'checked' : ''}>
+                <span>${API.escapeHtml(ch.title)}${badge}</span>
+            `;
+            row.querySelector('input').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    if (!selectedIds.has(ch.id)) {
+                        auditSelectedChannels.push({ id: ch.id, title: ch.title });
+                        selectedIds.add(ch.id);
+                        renderSelectedChips();
+                    }
+                } else {
+                    auditSelectedChannels = auditSelectedChannels.filter(c => c.id !== ch.id);
+                    selectedIds.delete(ch.id);
+                    renderSelectedChips();
+                }
+            });
+            listDiv.appendChild(row);
+        });
+    }
+
+    function selectAllVisibleChannels() {
+        const listDiv = document.getElementById('audit-browser-list');
+        const checkboxes = listDiv.querySelectorAll('input[type="checkbox"]:not(:checked)');
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change'));
+        });
+    }
+
     function renderSelectedChips() {
         const wrapper = document.getElementById('audit-selected-chips');
         const container = document.getElementById('audit-chips-container');
@@ -1316,6 +793,9 @@ const ImagesView = (() => {
             });
             container.appendChild(chip);
         });
+
+        // Sync browser checkboxes if open
+        renderChannelBrowser();
     }
 
     // --- Saved channel lists ---
