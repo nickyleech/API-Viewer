@@ -167,20 +167,6 @@ const ScheduleView = (() => {
         const channelId = document.getElementById('sch-channel-id').value;
         const channelName = (document.getElementById('sch-channel-search') || {}).value || '';
 
-        if (channelId) {
-            const channelInfo = document.createElement('div');
-            channelInfo.style.cssText = 'font-size:12px;color:var(--color-text);margin-bottom:4px';
-            channelInfo.innerHTML = `<strong>${API.escapeHtml(channelName)}</strong> <code style="user-select:all">${API.escapeHtml(channelId)}</code> <button class="sch-copy-id-btn" data-id="${API.escapeHtml(channelId)}" style="background:none;border:1px solid var(--color-border);border-radius:3px;cursor:pointer;font-size:11px;padding:1px 5px;color:var(--color-text-secondary)">Copy</button>`;
-            channelInfo.querySelector('.sch-copy-id-btn').addEventListener('click', (e) => {
-                const btn = e.target;
-                navigator.clipboard.writeText(btn.dataset.id).then(() => {
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-                });
-            });
-            container.appendChild(channelInfo);
-        }
-
         const info = document.createElement('div');
         info.className = 'results-info';
         info.textContent = `${data.total || items.length} programme(s)`;
@@ -222,7 +208,21 @@ const ScheduleView = (() => {
             list.appendChild(card);
         });
 
-        container.firstElementChild.after(API.jsonToggle(data));
+        const jsonToggle = API.jsonToggle(data);
+        if (channelId) {
+            const channelInfo = document.createElement('span');
+            channelInfo.style.cssText = 'font-size:12px;color:var(--color-text);margin-left:12px';
+            channelInfo.innerHTML = `<strong>${API.escapeHtml(channelName)}</strong> <code style="user-select:all">${API.escapeHtml(channelId)}</code> <button class="sch-copy-id-btn" data-id="${API.escapeHtml(channelId)}" style="background:none;border:1px solid var(--color-border);border-radius:3px;cursor:pointer;font-size:11px;padding:1px 5px;color:var(--color-text-secondary)">Copy</button>`;
+            channelInfo.querySelector('.sch-copy-id-btn').addEventListener('click', (e) => {
+                const btn = e.target;
+                navigator.clipboard.writeText(btn.dataset.id).then(() => {
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+                });
+            });
+            jsonToggle.querySelector('.json-toggle-buttons').appendChild(channelInfo);
+        }
+        container.firstElementChild.after(jsonToggle);
     }
 
     function restoreListView() {
