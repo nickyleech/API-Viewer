@@ -355,6 +355,8 @@ function getDateRange() {
         info.textContent = `${items.length} programme(s)`;
         container.appendChild(info);
 
+        const channelName = (document.getElementById('img-channel-search') || {}).value || '';
+
         items.forEach(item => {
             const images = getImages(item);
             const hasImages = images.length > 0;
@@ -387,6 +389,7 @@ function getDateRange() {
                         <div style="font-size:18px;font-weight:700;color:var(--color-accent)">${API.escapeHtml(time)}</div>
                         <div style="font-size:11px;color:var(--color-text-secondary)">${API.escapeHtml(date)}</div>
                         ${duration ? `<div style="font-size:11px;color:var(--color-text-secondary)">${API.escapeHtml(duration)}</div>` : ''}
+                        ${channelName ? `<div style="font-size:10px;color:var(--color-text-secondary);margin-top:4px;font-weight:600">${API.escapeHtml(channelName)}</div>` : ''}
                     </div>
                     <div style="flex:1">
                         <div class="card-title">${API.escapeHtml(item.title || 'Untitled')}</div>
