@@ -2,27 +2,6 @@
   "version": 1,
   "lists": [
     {
-      "name": "Fred",
-      "channels": [
-        {
-          "id": "3d8bb828-1eb5-5de5-bb40-efba8bae9835",
-          "title": "4seven"
-        },
-        {
-          "id": "bbc2a081-fc85-5c05-8ff0-4438cc97de2c",
-          "title": "5"
-        },
-        {
-          "id": "022ec304-25b9-5b07-aaf1-c90a0393abce",
-          "title": "5Action"
-        },
-        {
-          "id": "9512892c-d864-513c-b630-abb5df6b49f4",
-          "title": "5STAR"
-        }
-      ]
-    },
-    {
       "name": "Gerard List 2",
       "channels": [
         {
