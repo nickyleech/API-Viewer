@@ -33,10 +33,20 @@ const ImagesView = (() => {
                     <input type="hidden" id="img-start" value="${today}">
                     <div class="form-group">
                         <label>&nbsp;</label>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <button id="img-prev-day" class="btn btn-sm btn-secondary">&larr;</button>
+                            <div style="position:relative;display:inline-block">
+                                <span id="img-date-label" style="font-weight:600;font-size:14px;min-width:220px;text-align:center;display:inline-block;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px"></span>
+                                <input type="date" id="img-date-picker" value="${today}" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer">
+                            </div>
+                            <button id="img-next-day" class="btn btn-sm btn-secondary">&rarr;</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
                         <button id="img-load" class="btn btn-primary">Load Programmes</button>
                     </div>
                 </div>
-                <div id="img-day-nav" style="display:none"></div>
                 <div id="img-filter-bar" style="display:none">
                     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
                         <span style="font-size:14px;font-weight:600;color:var(--color-text-secondary)">Show:</span>
@@ -142,6 +152,16 @@ const ImagesView = (() => {
 
         // Schedule tab setup
         setupChannelSearch();
+        updateDateLabel();
+        document.getElementById('img-prev-day').addEventListener('click', () => shiftImgDay(-1));
+        document.getElementById('img-next-day').addEventListener('click', () => shiftImgDay(1));
+        document.getElementById('img-date-picker').addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('img-start').value = e.target.value;
+                updateDateLabel();
+                if (document.getElementById('img-channel-id').value) loadProgrammes();
+            }
+        });
         document.getElementById('img-load').addEventListener('click', loadProgrammes);
         document.getElementById('img-filter-all').addEventListener('click', () => applyFilter('all'));
         document.getElementById('img-filter-with').addEventListener('click', () => applyFilter('with'));
@@ -268,42 +288,20 @@ function getDateRange() {
             scheduleItems = data.item || [];
             updateCounts();
             document.getElementById('img-filter-bar').style.display = '';
-            renderImgDayNav();
             applyFilter('all');
         } catch (err) {
             scheduleItems = [];
             document.getElementById('img-filter-bar').style.display = 'none';
-            document.getElementById('img-day-nav').style.display = 'none';
             API.showError(results, err.message);
         }
     }
 
-    function renderImgDayNav() {
-        const nav = document.getElementById('img-day-nav');
+    function updateDateLabel() {
         const startDate = document.getElementById('img-start').value;
         const dt = new Date(startDate);
         const dateStr = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-        nav.style.display = '';
-        nav.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
-                <button id="img-prev-day" class="btn btn-sm btn-secondary">&larr; Previous Day</button>
-                <div style="position:relative;display:inline-block">
-                    <span id="img-date-label" style="font-weight:600;font-size:15px;min-width:260px;text-align:center;display:inline-block;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px">${API.escapeHtml(dateStr)}</span>
-                    <input type="date" id="img-date-picker" value="${startDate}" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer">
-                </div>
-                <button id="img-next-day" class="btn btn-sm btn-secondary">Next Day &rarr;</button>
-            </div>
-        `;
-
-        document.getElementById('img-prev-day').addEventListener('click', () => shiftImgDay(-1));
-        document.getElementById('img-next-day').addEventListener('click', () => shiftImgDay(1));
-        document.getElementById('img-date-picker').addEventListener('change', (e) => {
-            if (e.target.value) {
-                document.getElementById('img-start').value = e.target.value;
-                loadProgrammes();
-            }
-        });
+        document.getElementById('img-date-label').textContent = dateStr;
+        document.getElementById('img-date-picker').value = startDate;
     }
 
     function shiftImgDay(offset) {
@@ -311,7 +309,8 @@ function getDateRange() {
         const dt = new Date(dateInput.value);
         dt.setDate(dt.getDate() + offset);
         dateInput.value = dt.toISOString().slice(0, 10);
-        loadProgrammes();
+        updateDateLabel();
+        if (document.getElementById('img-channel-id').value) loadProgrammes();
     }
 
     function getImages(item) {
@@ -513,7 +512,7 @@ function getDateRange() {
                 const parts = [];
                 if (img.label) parts.push(img.label);
                 if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
-                if (img.copyright) parts.push(`\u00A9 ${img.copyright}`);
+                parts.push(img.copyright ? `\u00A9 ${img.copyright}` : '\u00A9 No copyright');
                 meta.innerHTML = `
                     ${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}
                     <a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open in new tab</a>
