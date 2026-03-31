@@ -120,6 +120,7 @@ const ImagesView = (() => {
                         <label>&nbsp;</label>
                         <div style="display:flex;gap:6px">
                             <button id="audit-save-list" class="btn btn-sm btn-secondary">Save List</button>
+                            <button id="audit-update-list" class="btn btn-sm btn-secondary" disabled>Update</button>
                             <button id="audit-delete-list" class="btn btn-sm btn-secondary">Delete</button>
                         </div>
                     </div>
@@ -1223,6 +1224,7 @@ const ImagesView = (() => {
 
         document.getElementById('audit-run').addEventListener('click', runAudit);
         document.getElementById('audit-save-list').addEventListener('click', saveChannelList);
+        document.getElementById('audit-update-list').addEventListener('click', updateChannelList);
         document.getElementById('audit-delete-list').addEventListener('click', deleteChannelList);
         document.getElementById('audit-saved-lists').addEventListener('change', loadChannelList);
         document.getElementById('audit-clear-all').addEventListener('click', () => {
@@ -1319,6 +1321,7 @@ const ImagesView = (() => {
     // --- Saved channel lists ---
 
     let savedChannelLists = [];
+    let activeListIdx = null;
 
     function loadSavedChannelLists() {
         try {
@@ -1370,6 +1373,8 @@ const ImagesView = (() => {
         if (!confirm(`Delete "${savedChannelLists[idx].name}"?`)) return;
 
         savedChannelLists.splice(idx, 1);
+        activeListIdx = null;
+        document.getElementById('audit-update-list').disabled = true;
         persistSavedChannelLists();
         populateSavedListsDropdown();
         API.toast('List deleted.', 'success');
@@ -1378,11 +1383,35 @@ const ImagesView = (() => {
     function loadChannelList() {
         const sel = document.getElementById('audit-saved-lists');
         const idx = parseInt(sel.value);
-        if (isNaN(idx)) return;
+        if (isNaN(idx)) {
+            activeListIdx = null;
+            document.getElementById('audit-update-list').disabled = true;
+            return;
+        }
 
+        activeListIdx = idx;
         auditSelectedChannels = [...savedChannelLists[idx].channels];
         renderSelectedChips();
+        document.getElementById('audit-update-list').disabled = false;
         API.toast(`Loaded "${savedChannelLists[idx].name}".`, 'success');
+    }
+
+    function updateChannelList() {
+        if (activeListIdx === null || !savedChannelLists[activeListIdx]) {
+            API.toast('No list selected to update.', 'warning');
+            return;
+        }
+        if (auditSelectedChannels.length === 0) {
+            API.toast('Select channels first.', 'warning');
+            return;
+        }
+        const name = savedChannelLists[activeListIdx].name;
+        savedChannelLists[activeListIdx].channels = auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }));
+        persistSavedChannelLists();
+        populateSavedListsDropdown();
+        // Re-select the active list in the dropdown
+        document.getElementById('audit-saved-lists').value = activeListIdx;
+        API.toast(`Updated "${name}".`, 'success');
     }
 
     // --- Audit execution ---
