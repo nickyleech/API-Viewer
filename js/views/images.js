@@ -99,16 +99,17 @@ const ImagesView = (() => {
                         <button id="audit-browse-all" class="btn btn-sm btn-secondary">Browse All Channels</button>
                     </div>
                     <div class="form-group">
-                        <label>Saved Lists</label>
+                        <label>Channel Lists</label>
                         <select id="audit-saved-lists" class="select" style="min-width:180px">
-                            <option value="">Load a saved list...</option>
+                            <option value="">Select a list...</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>&nbsp;</label>
                         <div style="display:flex;gap:6px">
-                            <button id="audit-save-list" class="btn btn-sm btn-secondary">Save List</button>
+                            <button id="audit-save-list" class="btn btn-sm btn-secondary">Add List</button>
                             <button id="audit-update-list" class="btn btn-sm btn-secondary" disabled>Update</button>
+                            <button id="audit-rename-list" class="btn btn-sm btn-secondary" disabled>Rename</button>
                             <button id="audit-delete-list" class="btn btn-sm btn-secondary">Delete</button>
                         </div>
                     </div>
@@ -607,6 +608,7 @@ const ImagesView = (() => {
         document.getElementById('audit-run').addEventListener('click', runAudit);
         document.getElementById('audit-save-list').addEventListener('click', saveChannelList);
         document.getElementById('audit-update-list').addEventListener('click', updateChannelList);
+        document.getElementById('audit-rename-list').addEventListener('click', renameChannelList);
         document.getElementById('audit-delete-list').addEventListener('click', deleteChannelList);
         document.getElementById('audit-saved-lists').addEventListener('change', loadChannelList);
         document.getElementById('audit-clear-all').addEventListener('click', () => {
@@ -847,7 +849,7 @@ const ImagesView = (() => {
 
     function populateSavedListsDropdown() {
         const sel = document.getElementById('audit-saved-lists');
-        sel.innerHTML = '<option value="">Load a saved list...</option>';
+        sel.innerHTML = '<option value="">Select a list...</option>';
         savedChannelLists.forEach((list, idx) => {
             const opt = document.createElement('option');
             opt.value = idx;
@@ -860,22 +862,26 @@ const ImagesView = (() => {
         const btn = document.getElementById('audit-save-list');
         if (btn.disabled) return;
 
-        if (auditSelectedChannels.length === 0) {
-            API.toast('Select channels first.', 'warning');
-            return;
-        }
-        const name = prompt('Enter a name for this channel list:');
+        const name = prompt('Enter a name for the new list:');
         if (!name || !name.trim()) return;
 
         btn.disabled = true;
         try {
+            const newIdx = savedChannelLists.length;
             savedChannelLists.push({
                 name: name.trim(),
                 channels: auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }))
             });
-            await persistSavedChannelLists(`Save channel list: ${name.trim()}`);
+            await persistSavedChannelLists(`Add channel list: ${name.trim()}`);
             populateSavedListsDropdown();
-            API.toast('Channel list saved.', 'success');
+
+            // Auto-select the new list
+            activeListIdx = newIdx;
+            document.getElementById('audit-saved-lists').value = newIdx;
+            document.getElementById('audit-update-list').disabled = false;
+            document.getElementById('audit-rename-list').disabled = false;
+
+            API.toast(`List "${name.trim()}" added.`, 'success');
         } finally {
             btn.disabled = false;
         }
@@ -896,6 +902,7 @@ const ImagesView = (() => {
             savedChannelLists.splice(idx, 1);
             activeListIdx = null;
             document.getElementById('audit-update-list').disabled = true;
+            document.getElementById('audit-rename-list').disabled = true;
             await persistSavedChannelLists(`Delete channel list: ${deletedName}`);
             populateSavedListsDropdown();
             API.toast('List deleted.', 'success');
@@ -910,6 +917,7 @@ const ImagesView = (() => {
         if (isNaN(idx)) {
             activeListIdx = null;
             document.getElementById('audit-update-list').disabled = true;
+            document.getElementById('audit-rename-list').disabled = true;
             return;
         }
 
@@ -917,7 +925,12 @@ const ImagesView = (() => {
         auditSelectedChannels = [...savedChannelLists[idx].channels];
         renderSelectedChips();
         document.getElementById('audit-update-list').disabled = false;
-        API.toast(`Loaded "${savedChannelLists[idx].name}".`, 'success');
+        document.getElementById('audit-rename-list').disabled = false;
+        if (auditSelectedChannels.length === 0) {
+            API.toast(`"${savedChannelLists[idx].name}" has no channels — select channels and click Update to add them.`, 'warning');
+        } else {
+            API.toast(`Loaded "${savedChannelLists[idx].name}".`, 'success');
+        }
     }
 
     async function updateChannelList() {
@@ -939,6 +952,29 @@ const ImagesView = (() => {
             populateSavedListsDropdown();
             document.getElementById('audit-saved-lists').value = activeListIdx;
             API.toast(`Updated "${name}".`, 'success');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function renameChannelList() {
+        const btn = document.getElementById('audit-rename-list');
+        if (activeListIdx === null || !savedChannelLists[activeListIdx]) {
+            API.toast('No list selected to rename.', 'warning');
+            return;
+        }
+
+        const oldName = savedChannelLists[activeListIdx].name;
+        const newName = prompt('Enter a new name for this list:', oldName);
+        if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+        btn.disabled = true;
+        try {
+            savedChannelLists[activeListIdx].name = newName.trim();
+            await persistSavedChannelLists(`Rename channel list: ${oldName} → ${newName.trim()}`);
+            populateSavedListsDropdown();
+            document.getElementById('audit-saved-lists').value = activeListIdx;
+            API.toast(`Renamed to "${newName.trim()}".`, 'success');
         } finally {
             btn.disabled = false;
         }
