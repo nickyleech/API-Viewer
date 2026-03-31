@@ -15,7 +15,7 @@ const ImagesView = (() => {
         container.innerHTML = `
             <div class="view-header">
                 <h2>Image Viewer</h2>
-                <p>Browse programme images by schedule or search for a programme by name.</p>
+                <p>Browse programme images by schedule</p>
             </div>
             <div class="view-tabs">
                 <button class="view-tab active" data-tab="audit">Image Audit</button>
@@ -850,6 +850,8 @@ const ImagesView = (() => {
             } catch (err) {
                 API.toast('Failed to save to GitHub: ' + err.message, 'error');
             }
+        } else {
+            API.toast('No GitHub token — changes saved locally only. Add a token in Settings to persist.', 'warning');
         }
     }
 
