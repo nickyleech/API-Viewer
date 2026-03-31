@@ -851,9 +851,9 @@ const EpgView = (() => {
         const legend = document.createElement('div');
         legend.style.cssText = 'display:flex;gap:16px;margin-bottom:12px;font-size:12px;flex-wrap:wrap';
         legend.innerHTML = `
-            <span><span style="display:inline-block;width:14px;height:14px;background:#c8e6c9;border:1px solid #a5d6a7;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Matches mode</span>
-            <span><span style="display:inline-block;width:14px;height:14px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Differs from mode</span>
-            <span><span style="display:inline-block;width:14px;height:14px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Not present</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Matches mode</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:#ff9800;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Differs from mode</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:#eeeeee;border:1px solid #ccc;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Not present</span>
         `;
         container.appendChild(legend);
 
@@ -879,11 +879,11 @@ const EpgView = (() => {
             allRegionNames.forEach(rName => {
                 const epg = v.regionEpgs[rName];
                 if (!epg) {
-                    html += `<td style="text-align:center;background:#f5f5f5;color:#999">-</td>`;
+                    html += `<td style="text-align:center;background-color:#eeeeee !important;color:#999">-</td>`;
                 } else if (epg === mode) {
-                    html += `<td style="text-align:center;background:#c8e6c9;color:#2e7d32"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                    html += `<td style="text-align:center;background-color:#4caf50 !important"><strong style="color:#fff">${API.escapeHtml(epg)}</strong></td>`;
                 } else {
-                    html += `<td style="text-align:center;background:#fff3e0;color:#e65100"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                    html += `<td style="text-align:center;background-color:#ff9800 !important"><strong style="color:#fff">${API.escapeHtml(epg)}</strong></td>`;
                 }
             });
             tr.innerHTML = html;
