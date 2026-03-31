@@ -304,7 +304,7 @@ function getDateRange() {
         (asset.related || []).forEach(rel => {
             const relMedia = Array.isArray(rel.media) ? rel.media : rel.media ? [rel.media] : [];
             API.extractImages(relMedia.filter(Boolean)).forEach(img => {
-                seriesImages.push({ ...img, source: rel.type || 'related' });
+                seriesImages.push({ ...img, source: rel.type || 'related', sourceNumber: rel.number, sourceTitle: rel.title });
             });
         });
 
@@ -511,37 +511,61 @@ function getDateRange() {
                 return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
             });
 
-            // Jump navigation when multiple groups exist
-            if (sortedKeys.length > 1) {
+            // Build flat list of sections for navigation and rendering
+            const sections = [];
+            sortedKeys.forEach(key => {
+                const groupImages = groups[key];
+                if (key === 'season') {
+                    // Sub-group season images by sourceNumber
+                    const subGroups = {};
+                    groupImages.forEach(img => {
+                        const subKey = img.sourceNumber != null ? String(img.sourceNumber) : 'unknown';
+                        if (!subGroups[subKey]) subGroups[subKey] = { images: [], title: img.sourceTitle };
+                        subGroups[subKey].images.push(img);
+                    });
+                    const sortedSubKeys = Object.keys(subGroups).sort((a, b) => {
+                        const na = parseInt(a), nb = parseInt(b);
+                        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                        return a.localeCompare(b);
+                    });
+                    sortedSubKeys.forEach(subKey => {
+                        const sub = subGroups[subKey];
+                        const label = subKey !== 'unknown' ? `Season ${subKey}` : 'Season (unknown)';
+                        sections.push({ id: `img-group-season-${subKey}`, label, images: sub.images });
+                    });
+                } else {
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                    sections.push({ id: `img-group-${key}`, label: `${label}`, images: groupImages });
+                }
+            });
+
+            // Jump navigation when multiple sections exist
+            if (sections.length > 1) {
                 const nav = document.createElement('div');
                 nav.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px';
-                sortedKeys.forEach(key => {
-                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                sections.forEach(section => {
                     const btn = document.createElement('button');
                     btn.className = 'btn btn-sm btn-secondary';
-                    btn.textContent = `${label} (${groups[key].length})`;
+                    btn.textContent = `${section.label} (${section.images.length})`;
                     btn.addEventListener('click', () => {
-                        document.getElementById(`img-group-${key}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        document.getElementById(section.id).scrollIntoView({ behavior: 'smooth', block: 'start' });
                     });
                     nav.appendChild(btn);
                 });
                 gallerySection.appendChild(nav);
             }
 
-            sortedKeys.forEach(key => {
-                const groupImages = groups[key];
-                const label = key.charAt(0).toUpperCase() + key.slice(1);
-
+            sections.forEach(section => {
                 const heading = document.createElement('h3');
-                heading.id = `img-group-${key}`;
+                heading.id = section.id;
                 heading.style.cssText = 'margin:16px 0 12px';
-                heading.textContent = `${label} Images (${groupImages.length})`;
+                heading.textContent = `${section.label} Images (${section.images.length})`;
                 gallerySection.appendChild(heading);
 
                 const gallery = document.createElement('div');
                 gallery.className = 'img-gallery';
 
-                groupImages.forEach(img => {
+                section.images.forEach(img => {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'img-gallery-item';
 
