@@ -857,12 +857,23 @@ const EpgView = (() => {
         `;
         container.appendChild(legend);
 
-        // Table
+        // Sticky column styles
+        const stickyName = 'position:sticky;left:0;z-index:2;min-width:180px;max-width:180px;background:var(--color-surface)';
+        const stickyCov  = 'position:sticky;left:180px;z-index:2;min-width:70px;max-width:70px;background:var(--color-surface)';
+        const stickyMode = 'position:sticky;left:250px;z-index:2;min-width:60px;max-width:60px;background:var(--color-surface);border-right:2px solid var(--color-border)';
+        const stickyNameH = stickyName.replace('var(--color-surface)', 'var(--color-bg)') + ';z-index:3';
+        const stickyCovH  = stickyCov.replace('var(--color-surface)', 'var(--color-bg)') + ';z-index:3';
+        const stickyModeH = stickyMode.replace('var(--color-surface)', 'var(--color-bg)') + ';z-index:3';
+
+        // Table in scrollable wrapper
+        const scrollWrap = document.createElement('div');
+        scrollWrap.style.cssText = 'overflow-x:auto;max-width:100%';
         const table = document.createElement('table');
         table.className = 'data-table';
+        table.style.minWidth = 'max-content';
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        headerRow.innerHTML = '<th>Channel Name</th><th style="text-align:center">Coverage</th><th style="text-align:center">Mode</th>';
+        headerRow.innerHTML = `<th style="${stickyNameH}">Channel Name</th><th style="text-align:center;${stickyCovH}">Coverage</th><th style="text-align:center;${stickyModeH}">Mode</th>`;
         allRegionNames.forEach(rName => {
             headerRow.innerHTML += `<th style="text-align:center;min-width:50px;font-size:11px">${API.escapeHtml(rName)}</th>`;
         });
@@ -873,9 +884,9 @@ const EpgView = (() => {
         variations.forEach(v => {
             const tr = document.createElement('tr');
             const mode = getMode(v.regionEpgs);
-            let html = `<td>${API.escapeHtml(v.title)}</td>`;
-            html += `<td style="text-align:center;font-size:12px">${v.presentCount}/${v.totalRegions}</td>`;
-            html += `<td style="text-align:center;font-weight:600">${API.escapeHtml(mode || '-')}</td>`;
+            let html = `<td style="${stickyName}">${API.escapeHtml(v.title)}</td>`;
+            html += `<td style="text-align:center;font-size:12px;${stickyCov}">${v.presentCount}/${v.totalRegions}</td>`;
+            html += `<td style="text-align:center;font-weight:600;${stickyMode}">${API.escapeHtml(mode || '-')}</td>`;
             allRegionNames.forEach(rName => {
                 const epg = v.regionEpgs[rName];
                 if (!epg) {
@@ -890,7 +901,8 @@ const EpgView = (() => {
             tbody.appendChild(tr);
         });
         table.appendChild(tbody);
-        container.appendChild(table);
+        scrollWrap.appendChild(table);
+        container.appendChild(scrollWrap);
     }
 
     function downloadPlatformVariationsExcel(variations, regionData, platformName) {
