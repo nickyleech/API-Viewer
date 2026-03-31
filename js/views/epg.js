@@ -97,9 +97,16 @@ const EpgView = (() => {
         API.showLoading(results);
         try {
             const data = await API.fetch('/channel', params);
-            epgChannels = (data.item || [])
-                .filter(ch => ch.epg)
-                .sort((a, b) => parseInt(a.epg) - parseInt(b.epg));
+            const allItems = data.item || [];
+            const hasRegions = regions.length > 0;
+            epgChannels = hasRegions
+                ? allItems.filter(ch => ch.epg).sort((a, b) => parseInt(a.epg) - parseInt(b.epg))
+                : allItems.sort((a, b) => {
+                    if (a.epg && b.epg) return parseInt(a.epg) - parseInt(b.epg);
+                    if (a.epg) return -1;
+                    if (b.epg) return 1;
+                    return (a.title || '').localeCompare(b.title || '');
+                });
 
             document.getElementById('epg-search').value = '';
             filteredChannels = epgChannels;
@@ -206,7 +213,7 @@ const EpgView = (() => {
                 `<span class="badge ${a === 'hd' ? 'badge-green' : 'badge-gray'}">${API.escapeHtml(a)}</span>`
             ).join(' ');
             tr.innerHTML = `
-                <td style="text-align:center"><strong>${API.escapeHtml(ch.epg)}</strong></td>
+                <td style="text-align:center"><strong>${ch.epg ? API.escapeHtml(ch.epg) : '-'}</strong></td>
                 <td>${API.escapeHtml(ch.title)}</td>
                 <td>${API.escapeHtml(regionName)}</td>
                 <td>${API.escapeHtml(cats || '-')}</td>
