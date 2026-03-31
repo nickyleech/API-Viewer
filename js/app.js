@@ -4,7 +4,8 @@ const App = (() => {
         channels: ChannelsView,
         epg: EpgView,
         schedule: ScheduleView,
-        images: ImagesView
+        images: ImagesView,
+        logos: LogosView
     };
 
     let currentView = null;
