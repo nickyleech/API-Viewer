@@ -6,38 +6,126 @@ const LogosView = (() => {
         container.innerHTML = `
             <div class="view-header">
                 <h2>Logos</h2>
-                <p>Browse channel logos. Click the download button to save an individual logo.</p>
+                <p>Browse channel logos. Search for a single channel or load all logos at once.</p>
             </div>
             <div class="filter-bar">
                 <div class="form-group" style="min-width:300px;max-width:400px">
-                    <label>Search</label>
-                    <input type="text" id="logo-search-input" class="input" placeholder="Type to filter by channel name..." style="width:100%">
+                    <label>Channel</label>
+                    <input type="text" id="logo-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
+                    <div id="logo-channel-dropdown" class="channel-dropdown"></div>
+                    <input type="hidden" id="logo-channel-id">
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button id="logo-load-all-btn" class="btn btn-primary">Load All Logos</button>
                 </div>
             </div>
             <div id="logos-results"></div>
         `;
 
-        document.getElementById('logo-search-input').addEventListener('input', filterChannels);
-        await loadAllChannels();
+        setupChannelSearch();
+        document.getElementById('logo-load-all-btn').addEventListener('click', loadAllLogos);
+        await loadChannelList();
     }
 
-    async function loadAllChannels() {
+    async function loadChannelList() {
         const results = document.getElementById('logos-results');
         API.showLoading(results);
 
         try {
             const data = await API.fetch('/channel');
-            // Deduplicate by channel title (same channel can have multiple IDs across platforms)
             const seen = new Set();
             allChannels = (data.item || [])
                 .filter(ch => { const t = (ch.title || '').toLowerCase(); if (seen.has(t)) return false; seen.add(t); return true; })
                 .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            channelDetails = [];
+            results.innerHTML = `<div class="results-info">${allChannels.length} unique channel(s) available. Search for a channel or click <strong>Load All Logos</strong>.</div>`;
         } catch (err) {
             API.showError(results, err.message);
+        }
+    }
+
+    function setupChannelSearch() {
+        const input = document.getElementById('logo-channel-search');
+        const dropdown = document.getElementById('logo-channel-dropdown');
+        const hiddenId = document.getElementById('logo-channel-id');
+
+        input.addEventListener('focus', () => input.select());
+        input.addEventListener('input', () => showDropdown());
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#logo-channel-search') && !e.target.closest('#logo-channel-dropdown')) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        function showDropdown() {
+            const query = (input.value || '').toLowerCase().trim();
+
+            if (allChannels.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            if (!query) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = allChannels.filter(ch => (ch.title || '').toLowerCase().includes(query));
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            dropdown.innerHTML = '';
+            filtered.slice(0, 50).forEach(ch => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
+                item.addEventListener('click', () => {
+                    input.value = ch.title;
+                    hiddenId.value = ch.id;
+                    dropdown.style.display = 'none';
+                    loadSingleChannel(ch.id);
+                });
+                dropdown.appendChild(item);
+            });
+
+            if (filtered.length > 50) {
+                const more = document.createElement('div');
+                more.className = 'dropdown-empty';
+                more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
+                dropdown.appendChild(more);
+            }
+
+            dropdown.style.display = 'block';
+        }
+    }
+
+    async function loadSingleChannel(channelId) {
+        const results = document.getElementById('logos-results');
+        API.showLoading(results);
+
+        try {
+            const ch = await API.fetch(`/channel/${channelId}`);
+            channelDetails = [ch];
+            renderLogos(results, [ch]);
+        } catch (err) {
+            API.showError(results, err.message);
+        }
+    }
+
+    async function loadAllLogos() {
+        const results = document.getElementById('logos-results');
+        if (allChannels.length === 0) {
+            API.toast('No channels loaded yet.', 'warning');
             return;
         }
 
-        // Batch-fetch individual channel details to get media/logo data
         results.innerHTML = '';
         const progressWrap = document.createElement('div');
         progressWrap.style.cssText = 'margin:16px 0';
@@ -71,29 +159,17 @@ const LogosView = (() => {
         renderLogos(results, channelDetails);
     }
 
-    function filterChannels() {
-        const query = (document.getElementById('logo-search-input').value || '').toLowerCase().trim();
-        const results = document.getElementById('logos-results');
-        if (!channelDetails.length) return;
-
-        const filtered = query
-            ? channelDetails.filter(ch => (ch.title || '').toLowerCase().includes(query))
-            : channelDetails;
-
-        renderLogos(results, filtered);
-    }
-
     function renderLogos(container, channels) {
         container.innerHTML = '';
 
         if (channels.length === 0) {
-            API.showEmpty(container, 'No channels found matching your search.');
+            API.showEmpty(container, 'No channels found.');
             return;
         }
 
         const info = document.createElement('div');
         info.className = 'results-info';
-        info.textContent = `Showing ${channels.length} of ${channelDetails.length} channel(s)`;
+        info.textContent = `Showing ${channels.length} channel(s)`;
         container.appendChild(info);
 
         const grid = document.createElement('div');
