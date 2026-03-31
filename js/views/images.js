@@ -177,7 +177,11 @@ const ImagesView = (() => {
         document.getElementById('img-filter-without').addEventListener('click', () => applyFilter('without'));
 
         // Audit tab setup
-        await setupAuditTab();
+        try {
+            await setupAuditTab();
+        } catch (err) {
+            console.error('Failed to set up audit tab:', err);
+        }
 
         // Load data
         await loadAllChannels();
@@ -601,10 +605,7 @@ const ImagesView = (() => {
     async function setupAuditTab() {
         setupAuditChannelSearch();
 
-        // Load lists from GitHub (async) then populate dropdown
-        await loadSavedChannelLists();
-        populateSavedListsDropdown();
-
+        // Wire up all event listeners first (synchronous, always succeeds)
         document.getElementById('audit-run').addEventListener('click', runAudit);
         document.getElementById('audit-save-list').addEventListener('click', saveChannelList);
         document.getElementById('audit-update-list').addEventListener('click', updateChannelList);
@@ -630,6 +631,10 @@ const ImagesView = (() => {
             auditSelectedChannels = [];
             renderSelectedChips();
         });
+
+        // Load lists from GitHub (async) — done last so a failure doesn't block the UI
+        await loadSavedChannelLists();
+        populateSavedListsDropdown();
     }
 
     function setupAuditChannelSearch() {
