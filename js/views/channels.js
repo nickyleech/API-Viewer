@@ -193,7 +193,7 @@ const ChannelsView = (() => {
         });
 
         if (rawData) {
-            container.appendChild(API.jsonToggle(rawData));
+            container.firstElementChild.after(API.jsonToggle(rawData));
         }
     }
 
@@ -295,7 +295,7 @@ const ChannelsView = (() => {
             panel.appendChild(mediaRow);
         }
 
-        panel.appendChild(API.jsonToggle(ch));
+        panel.firstElementChild.after(API.jsonToggle(ch));
     }
 
     return { render };

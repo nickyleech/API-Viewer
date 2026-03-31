@@ -199,7 +199,7 @@ const ContributorsView = (() => {
             panel.appendChild(row);
         });
 
-        panel.appendChild(API.jsonToggle(cont));
+        panel.firstElementChild.after(API.jsonToggle(cont));
     }
 
     return { render };

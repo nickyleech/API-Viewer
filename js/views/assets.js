@@ -104,7 +104,7 @@ const AssetsView = (() => {
             listEl.appendChild(card);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     function getTypeBadge(type) {
@@ -265,7 +265,7 @@ const AssetsView = (() => {
             }
         }
 
-        panel.appendChild(API.jsonToggle(asset));
+        panel.firstElementChild.after(API.jsonToggle(asset));
     }
 
     function renderContributors(container, data) {
@@ -326,7 +326,7 @@ const AssetsView = (() => {
             tbody.appendChild(tr);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     return { render };

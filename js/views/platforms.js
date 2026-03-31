@@ -51,7 +51,7 @@ const PlatformsView = (() => {
             container.appendChild(card);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     async function showPlatformDetail(platform) {
@@ -81,7 +81,7 @@ const PlatformsView = (() => {
                 </div>
             `).join('')}
         `;
-        panel.appendChild(API.jsonToggle(platform));
+        panel.firstElementChild.after(API.jsonToggle(platform));
         container.appendChild(panel);
 
         // Load regions
@@ -141,7 +141,7 @@ const PlatformsView = (() => {
             tbody.appendChild(tr);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     return { render };

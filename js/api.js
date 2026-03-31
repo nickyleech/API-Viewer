@@ -63,17 +63,36 @@ const API = (() => {
     function jsonToggle(data) {
         const wrapper = document.createElement('div');
         wrapper.className = 'json-toggle';
+        const jsonStr = JSON.stringify(data, null, 2);
+
+        const btnGroup = document.createElement('div');
+        btnGroup.className = 'json-toggle-buttons';
+
         const btn = document.createElement('button');
         btn.className = 'btn btn-sm btn-secondary';
         btn.textContent = 'Show JSON';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-sm btn-secondary';
+        copyBtn.textContent = 'Copy JSON';
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(jsonStr).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 1500);
+            });
+        });
+
         const viewer = document.createElement('pre');
         viewer.className = 'json-viewer';
-        viewer.textContent = JSON.stringify(data, null, 2);
+        viewer.textContent = jsonStr;
         btn.addEventListener('click', () => {
             viewer.classList.toggle('open');
             btn.textContent = viewer.classList.contains('open') ? 'Hide JSON' : 'Show JSON';
         });
-        wrapper.appendChild(btn);
+
+        btnGroup.appendChild(btn);
+        btnGroup.appendChild(copyBtn);
+        wrapper.appendChild(btnGroup);
         wrapper.appendChild(viewer);
         return wrapper;
     }

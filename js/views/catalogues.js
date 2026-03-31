@@ -50,7 +50,7 @@ const CataloguesView = (() => {
             container.appendChild(card);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     async function showCatalogueDetail(catalogue) {
@@ -71,7 +71,7 @@ const CataloguesView = (() => {
             <div class="detail-row"><div class="detail-label">ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(catalogue.id)}</code></div></div>
             ${catalogue.namespace ? `<div class="detail-row"><div class="detail-label">Namespace</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(catalogue.namespace)}</span></div></div>` : ''}
         `;
-        panel.appendChild(API.jsonToggle(catalogue));
+        panel.firstElementChild.after(API.jsonToggle(catalogue));
         container.appendChild(panel);
 
         // Asset search section
@@ -197,7 +197,7 @@ const CataloguesView = (() => {
             container.appendChild(card);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     async function showAssetDetail(catalogueId, assetId) {
@@ -386,7 +386,7 @@ const CataloguesView = (() => {
             });
         }
 
-        panel.appendChild(API.jsonToggle(data));
+        panel.firstElementChild.after(API.jsonToggle(data));
     }
 
     function openLightbox(src) {

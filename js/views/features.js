@@ -115,7 +115,7 @@ const FeaturesView = (() => {
             container.appendChild(card);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     function showFeatureDetail(feature) {
@@ -222,7 +222,7 @@ const FeaturesView = (() => {
             });
         }
 
-        panel.appendChild(API.jsonToggle(feature));
+        panel.firstElementChild.after(API.jsonToggle(feature));
     }
 
     return { render };

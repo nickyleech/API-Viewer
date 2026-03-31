@@ -369,7 +369,12 @@ body {
 
 /* ===== JSON Viewer ===== */
 .json-toggle {
-    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.json-toggle-buttons {
+    display: flex;
+    gap: 8px;
 }
 
 .json-viewer {

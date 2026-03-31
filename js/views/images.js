@@ -482,10 +482,7 @@ function getDateRange() {
 
         renderImageGallery(container, images, item.title);
 
-        const jsonSection = document.createElement('div');
-        jsonSection.style.marginTop = '16px';
-        jsonSection.appendChild(API.jsonToggle(item));
-        container.appendChild(jsonSection);
+        panel.firstElementChild.after(API.jsonToggle(item));
     }
 
     // ============================================================

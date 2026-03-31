@@ -216,7 +216,7 @@ const EpgView = (() => {
         });
 
         if (rawData) {
-            container.appendChild(API.jsonToggle(rawData));
+            container.firstElementChild.after(API.jsonToggle(rawData));
         }
     }
 

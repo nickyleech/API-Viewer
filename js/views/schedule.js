@@ -218,7 +218,7 @@ const ScheduleView = (() => {
             list.appendChild(card);
         });
 
-        container.appendChild(API.jsonToggle(data));
+        container.firstElementChild.after(API.jsonToggle(data));
     }
 
     async function showProgrammeDetail(item) {
@@ -295,7 +295,7 @@ const ScheduleView = (() => {
             panel.appendChild(subRow);
         }
 
-        panel.appendChild(API.jsonToggle(item));
+        panel.firstElementChild.after(API.jsonToggle(item));
     }
 
     return { render };
