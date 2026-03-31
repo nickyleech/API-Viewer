@@ -297,13 +297,19 @@ function getDateRange() {
 
     function getImages(item) {
         const asset = item.asset || {};
-        const allMedia = [];
-        const assetMedia = asset.media || item.media || [];
-        (Array.isArray(assetMedia) ? assetMedia : [assetMedia]).forEach(m => { if (m) allMedia.push(m); });
+        const episodeMedia = asset.media || item.media || [];
+        const episodeList = Array.isArray(episodeMedia) ? episodeMedia : [episodeMedia];
+        const episodeImages = API.extractImages(episodeList.filter(Boolean)).map(img => ({ ...img, source: 'episode' }));
+
+        const seriesImages = [];
         (asset.related || []).forEach(rel => {
-            (Array.isArray(rel.media) ? rel.media : rel.media ? [rel.media] : []).forEach(m => { if (m) allMedia.push(m); });
+            const relMedia = Array.isArray(rel.media) ? rel.media : rel.media ? [rel.media] : [];
+            API.extractImages(relMedia.filter(Boolean)).forEach(img => {
+                seriesImages.push({ ...img, source: rel.type || 'related' });
+            });
         });
-        return API.extractImages(allMedia);
+
+        return [...episodeImages, ...seriesImages];
     }
 
     function updateCounts() {
@@ -353,6 +359,8 @@ function getDateRange() {
         items.forEach(item => {
             const images = getImages(item);
             const hasImages = images.length > 0;
+            const episodeImages = images.filter(img => img.source === 'episode');
+            const seriesImages = images.filter(img => img.source !== 'episode');
             const copyrights = [...new Set(images.map(img => img.copyright).filter(Boolean))];
             const dt = item.dateTime ? new Date(item.dateTime) : null;
             const time = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-';
@@ -368,6 +376,10 @@ function getDateRange() {
                 card.style.borderLeftWidth = '3px';
             }
 
+            const imageBadges = [];
+            if (episodeImages.length > 0) imageBadges.push(`<span class="badge badge-green">${episodeImages.length} episode</span>`);
+            if (seriesImages.length > 0) imageBadges.push(`<span class="badge badge-green">${seriesImages.length} series</span>`);
+
             card.innerHTML = `
                 <div style="display:flex;gap:16px;align-items:start">
                     <div style="min-width:70px;text-align:center">
@@ -380,7 +392,7 @@ function getDateRange() {
                         ${summary.short ? `<p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">${API.escapeHtml(summary.short)}</p>` : ''}
                         <div class="card-meta" style="margin-top:6px">
                             ${hasImages
-                                ? `<span class="badge badge-green">${images.length} image(s)</span>`
+                                ? imageBadges.join('')
                                 : '<span class="badge badge-orange">No images</span>'}
                             ${asset.type ? `<span class="badge badge-purple">${API.escapeHtml(asset.type)}</span>` : ''}
                         </div>
@@ -389,10 +401,16 @@ function getDateRange() {
                                 <span style="font-weight:600">&copy;</span> ${copyrights.map(c => API.escapeHtml(c)).join(' \u00B7 ')}
                             </div>
                         ` : ''}
-                        ${hasImages ? `
+                        ${episodeImages.length > 0 ? `
                             <div class="img-thumbs" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                                ${images.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:180px;max-height:120px;border-radius:4px;object-fit:cover;border:1px solid var(--color-border);cursor:pointer" alt="" onclick="event.stopPropagation()">`).join('')}
-                                ${images.length > 4 ? `<span style="align-self:center;font-size:12px;color:var(--color-text-secondary)">+${images.length - 4} more</span>` : ''}
+                                ${episodeImages.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:180px;max-height:120px;border-radius:4px;object-fit:cover;border:1px solid var(--color-border);cursor:pointer" alt="" onclick="event.stopPropagation()">`).join('')}
+                                ${episodeImages.length > 4 ? `<span style="align-self:center;font-size:12px;color:var(--color-text-secondary)">+${episodeImages.length - 4} more</span>` : ''}
+                            </div>
+                        ` : ''}
+                        ${seriesImages.length > 0 ? `
+                            <div class="img-thumbs" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                                ${seriesImages.slice(0, 4).map(r => `<img src="${API.escapeHtml(r.href)}" style="max-width:180px;max-height:120px;border-radius:4px;object-fit:cover;border:1px solid var(--color-border);cursor:pointer;opacity:0.7" alt="" onclick="event.stopPropagation()">`).join('')}
+                                ${seriesImages.length > 4 ? `<span style="align-self:center;font-size:12px;color:var(--color-text-secondary)">+${seriesImages.length - 4} more</span>` : ''}
                             </div>
                         ` : ''}
                     </div>
@@ -473,38 +491,62 @@ function getDateRange() {
         gallerySection.style.marginTop = '20px';
 
         if (images.length > 0) {
-            gallerySection.innerHTML = `<h3 style="margin-bottom:12px">Images (${images.length})</h3>`;
-            const gallery = document.createElement('div');
-            gallery.className = 'img-gallery';
-
+            // Group images by source
+            const groups = {};
             images.forEach(img => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'img-gallery-item';
-
-                const imgEl = document.createElement('img');
-                imgEl.src = img.href;
-                imgEl.alt = title || '';
-                imgEl.className = 'img-gallery-img';
-                imgEl.addEventListener('click', () => openLightbox(img.href, title));
-
-                wrapper.appendChild(imgEl);
-
-                const meta = document.createElement('div');
-                meta.className = 'img-gallery-meta';
-                const parts = [];
-                if (img.label) parts.push(img.label);
-                if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
-                parts.push(img.copyright ? `\u00A9 ${img.copyright}` : '\u00A9 No copyright');
-                meta.innerHTML = `
-                    ${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}
-                    <a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open in new tab</a>
-                `;
-                wrapper.appendChild(meta);
-
-                gallery.appendChild(wrapper);
+                const key = img.source || 'other';
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(img);
             });
 
-            gallerySection.appendChild(gallery);
+            const groupOrder = ['episode', 'series'];
+            const sortedKeys = Object.keys(groups).sort((a, b) => {
+                const ai = groupOrder.indexOf(a);
+                const bi = groupOrder.indexOf(b);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            });
+
+            sortedKeys.forEach(key => {
+                const groupImages = groups[key];
+                const label = key.charAt(0).toUpperCase() + key.slice(1);
+
+                const heading = document.createElement('h3');
+                heading.style.cssText = 'margin:16px 0 12px';
+                heading.textContent = `${label} Images (${groupImages.length})`;
+                gallerySection.appendChild(heading);
+
+                const gallery = document.createElement('div');
+                gallery.className = 'img-gallery';
+
+                groupImages.forEach(img => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'img-gallery-item';
+
+                    const imgEl = document.createElement('img');
+                    imgEl.src = img.href;
+                    imgEl.alt = title || '';
+                    imgEl.className = 'img-gallery-img';
+                    imgEl.addEventListener('click', () => openLightbox(img.href, title));
+
+                    wrapper.appendChild(imgEl);
+
+                    const meta = document.createElement('div');
+                    meta.className = 'img-gallery-meta';
+                    const parts = [];
+                    if (img.label) parts.push(img.label);
+                    if (img.width && img.height) parts.push(`${img.width} x ${img.height}`);
+                    parts.push(img.copyright ? `\u00A9 ${img.copyright}` : '\u00A9 No copyright');
+                    meta.innerHTML = `
+                        ${parts.length ? `<span>${API.escapeHtml(parts.join(' \u00B7 '))}</span>` : ''}
+                        <a href="${API.escapeHtml(img.href)}" target="_blank" rel="noopener" style="color:var(--color-accent);font-size:12px">Open in new tab</a>
+                    `;
+                    wrapper.appendChild(meta);
+
+                    gallery.appendChild(wrapper);
+                });
+
+                gallerySection.appendChild(gallery);
+            });
         } else {
             gallerySection.innerHTML = `
                 <div class="detail-panel" style="text-align:center;padding:32px">
