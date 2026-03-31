@@ -861,13 +861,33 @@ const EpgView = (() => {
         const stickyName = 'position:sticky;left:0;z-index:2;min-width:180px;max-width:180px;background:var(--color-surface)';
         const stickyCov  = 'position:sticky;left:180px;z-index:2;min-width:70px;max-width:70px;background:var(--color-surface)';
         const stickyMode = 'position:sticky;left:250px;z-index:2;min-width:60px;max-width:60px;background:var(--color-surface);border-right:2px solid var(--color-border)';
-        const stickyNameH = stickyName.replace('var(--color-surface)', 'var(--color-bg)') + ';z-index:3';
-        const stickyCovH  = stickyCov.replace('var(--color-surface)', 'var(--color-bg)') + ';z-index:3';
-        const stickyModeH = stickyMode.replace('var(--color-surface)', 'var(--color-bg)') + ';z-index:3';
+        const stickyNameH = stickyName.replace('var(--color-surface)', 'var(--color-bg)') + ';top:0;z-index:4';
+        const stickyCovH  = stickyCov.replace('var(--color-surface)', 'var(--color-bg)') + ';top:0;z-index:4';
+        const stickyModeH = stickyMode.replace('var(--color-surface)', 'var(--color-bg)') + ';top:0;z-index:4';
+        const stickyHeaderBase = 'position:sticky;top:0;z-index:3;background:var(--color-bg)';
 
-        // Table in scrollable wrapper
+        // Scroll arrows
+        const scrollNav = document.createElement('div');
+        scrollNav.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px';
+        ['&uarr;', '&darr;', '&larr;', '&rarr;'].forEach((arrow, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-secondary';
+            btn.innerHTML = arrow;
+            btn.style.cssText = 'min-width:36px;padding:4px 8px;font-size:16px';
+            btn.dataset.dir = i;
+            scrollNav.appendChild(btn);
+        });
+        container.appendChild(scrollNav);
+
         const scrollWrap = document.createElement('div');
-        scrollWrap.style.cssText = 'overflow-x:auto;max-width:100%';
+        scrollWrap.style.cssText = 'overflow:auto;max-width:100%;max-height:70vh';
+
+        const scrollAmount = 300;
+        const navBtns = scrollNav.querySelectorAll('button');
+        navBtns[0].addEventListener('click', () => scrollWrap.scrollBy({ top: -scrollAmount, behavior: 'smooth' }));
+        navBtns[1].addEventListener('click', () => scrollWrap.scrollBy({ top: scrollAmount, behavior: 'smooth' }));
+        navBtns[2].addEventListener('click', () => scrollWrap.scrollBy({ left: -scrollAmount, behavior: 'smooth' }));
+        navBtns[3].addEventListener('click', () => scrollWrap.scrollBy({ left: scrollAmount, behavior: 'smooth' }));
         const table = document.createElement('table');
         table.className = 'data-table';
         table.style.cssText = 'min-width:max-content;overflow:visible;border-collapse:separate;border-spacing:0';
@@ -875,7 +895,7 @@ const EpgView = (() => {
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `<th style="${stickyNameH}">Channel Name</th><th style="text-align:center;${stickyCovH}">Coverage</th><th style="text-align:center;${stickyModeH}">Mode</th>`;
         allRegionNames.forEach(rName => {
-            headerRow.innerHTML += `<th style="text-align:center;min-width:50px;font-size:11px">${API.escapeHtml(rName)}</th>`;
+            headerRow.innerHTML += `<th style="text-align:center;min-width:50px;font-size:11px;${stickyHeaderBase}">${API.escapeHtml(rName)}</th>`;
         });
         thead.appendChild(headerRow);
         table.appendChild(thead);
