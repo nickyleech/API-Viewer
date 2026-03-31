@@ -844,7 +844,7 @@ const EpgView = (() => {
         const legend = document.createElement('div');
         legend.style.cssText = 'display:flex;gap:16px;margin-bottom:12px;font-size:12px;flex-wrap:wrap';
         legend.innerHTML = `
-            <span><span style="display:inline-block;width:14px;height:14px;background:#e6f7ec;border:1px solid #b2dfdb;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Matches mode</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:#c8e6c9;border:1px solid #a5d6a7;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Matches mode</span>
             <span><span style="display:inline-block;width:14px;height:14px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Differs from mode</span>
             <span><span style="display:inline-block;width:14px;height:14px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Not present</span>
         `;
@@ -874,9 +874,9 @@ const EpgView = (() => {
                 if (!epg) {
                     html += `<td style="text-align:center;background:#f5f5f5;color:#999">-</td>`;
                 } else if (epg === mode) {
-                    html += `<td style="text-align:center;background:#e6f7ec"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                    html += `<td style="text-align:center;background:#c8e6c9;color:#2e7d32"><strong>${API.escapeHtml(epg)}</strong></td>`;
                 } else {
-                    html += `<td style="text-align:center;background:#fff3e0;font-weight:700;color:#e65100"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                    html += `<td style="text-align:center;background:#fff3e0;color:#e65100"><strong>${API.escapeHtml(epg)}</strong></td>`;
                 }
             });
             tr.innerHTML = html;
