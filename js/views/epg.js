@@ -151,42 +151,17 @@ const EpgView = (() => {
             return;
         }
 
-        // Results info + buttons row
-        const infoRow = document.createElement('div');
-        infoRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;';
+        if (regions.length === 0) {
+            const notice = document.createElement('div');
+            notice.style.cssText = 'padding:8px 12px;margin-bottom:12px;background:var(--color-warning-bg, #fff8e1);border:1px solid var(--color-warning, #e67e00);border-radius:4px;font-size:13px;color:var(--color-text)';
+            notice.textContent = 'EPG numbers cannot be displayed for platforms without a region.';
+            container.appendChild(notice);
+        }
 
         const info = document.createElement('div');
         info.className = 'results-info';
-        info.style.marginBottom = '0';
         info.textContent = `Showing ${items.length} of ${epgChannels.length} channel(s)`;
-        infoRow.appendChild(info);
-
-        const btnGroup = document.createElement('div');
-        btnGroup.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
-
-        const downloadBtn = document.createElement('button');
-        downloadBtn.className = 'btn btn-sm btn-secondary';
-        downloadBtn.textContent = 'Download CSV';
-        downloadBtn.addEventListener('click', () => downloadCsv(items, regionName));
-        btnGroup.appendChild(downloadBtn);
-
-        // Only show multi-region buttons if regions are loaded
-        if (regions.length > 1) {
-            const excelBtn = document.createElement('button');
-            excelBtn.className = 'btn btn-sm btn-primary';
-            excelBtn.textContent = 'Download All Regions (Excel)';
-            excelBtn.addEventListener('click', downloadAllRegionsExcel);
-            btnGroup.appendChild(excelBtn);
-
-            const viewBtn = document.createElement('button');
-            viewBtn.className = 'btn btn-sm btn-secondary';
-            viewBtn.textContent = 'View All Regions';
-            viewBtn.addEventListener('click', showAllRegionsView);
-            btnGroup.appendChild(viewBtn);
-        }
-
-        infoRow.appendChild(btnGroup);
-        container.appendChild(infoRow);
+        container.appendChild(info);
 
         // Table
         const table = document.createElement('table');
@@ -223,7 +198,30 @@ const EpgView = (() => {
         });
 
         if (rawData) {
-            container.firstElementChild.after(API.jsonToggle(rawData));
+            const jsonToggle = API.jsonToggle(rawData);
+            const toggleBtns = jsonToggle.querySelector('.json-toggle-buttons');
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'btn btn-sm btn-secondary';
+            downloadBtn.textContent = 'Download CSV';
+            downloadBtn.addEventListener('click', () => downloadCsv(items, regionName));
+            toggleBtns.appendChild(downloadBtn);
+
+            if (regions.length > 1) {
+                const excelBtn = document.createElement('button');
+                excelBtn.className = 'btn btn-sm btn-primary';
+                excelBtn.textContent = 'Download All Regions (Excel)';
+                excelBtn.addEventListener('click', downloadAllRegionsExcel);
+                toggleBtns.appendChild(excelBtn);
+
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'btn btn-sm btn-secondary';
+                viewBtn.textContent = 'View All Regions';
+                viewBtn.addEventListener('click', showAllRegionsView);
+                toggleBtns.appendChild(viewBtn);
+            }
+
+            container.firstElementChild.after(jsonToggle);
         }
     }
 
