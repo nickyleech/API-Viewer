@@ -458,6 +458,9 @@ function getDateRange() {
         const cats = (asset.category || []).map(c => c.name).join(', ');
         const certification = item.certification || asset.certification || {};
         const certEntries = Object.entries(certification).map(([k, v]) => `${k}: ${v}`).join(', ');
+        const seasonRel = (asset.related || []).find(r => r.type === 'season');
+        const seasonNum = asset.season || (seasonRel && seasonRel.number) || null;
+        const episodeNum = asset.number || (asset.meta && asset.meta.episode) || null;
 
         const panel = document.createElement('div');
         panel.className = 'detail-panel';
@@ -466,6 +469,7 @@ function getDateRange() {
             <div class="detail-row"><div class="detail-label">Broadcast</div><div class="detail-value">${API.escapeHtml(timeStr)}</div></div>
             ${item.duration ? `<div class="detail-row"><div class="detail-label">Duration</div><div class="detail-value">${item.duration} minutes</div></div>` : ''}
             ${asset.type ? `<div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(asset.type)}</span></div></div>` : ''}
+            ${seasonNum || episodeNum ? `<div class="detail-row"><div class="detail-label">Season / Episode</div><div class="detail-value">${seasonNum ? 'Season ' + API.escapeHtml(String(seasonNum)) : ''}${seasonNum && episodeNum ? ', ' : ''}${episodeNum ? 'Episode ' + API.escapeHtml(String(episodeNum)) : ''}</div></div>` : ''}
             ${asset.id ? `<div class="detail-row"><div class="detail-label">Asset ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(asset.id)}</code></div></div>` : ''}
             ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${API.escapeHtml(cats)}</div></div>` : ''}
             ${certEntries ? `<div class="detail-row"><div class="detail-label">Certification</div><div class="detail-value">${API.escapeHtml(certEntries)}</div></div>` : ''}
