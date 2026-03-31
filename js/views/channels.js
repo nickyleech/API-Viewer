@@ -10,7 +10,7 @@ const ChannelsView = (() => {
                 <p>Browse all TV and radio channels. Use the search box to find a channel by name, or filter by platform and region.</p>
             </div>
             <div class="filter-bar">
-                <div class="form-group" style="flex:1;min-width:250px">
+                <div class="form-group" style="min-width:300px;max-width:400px">
                     <label>Search</label>
                     <input type="text" id="ch-search-input" class="input" placeholder="Type to filter by channel name..." style="width:100%">
                 </div>
@@ -25,10 +25,6 @@ const ChannelsView = (() => {
                     <select id="ch-region" class="select">
                         <option value="">Select a platform first</option>
                     </select>
-                </div>
-                <div class="form-group">
-                    <label>Channel State Date</label>
-                    <input type="date" id="ch-date" class="input" style="min-width:160px" title="View channel names and attributes as they were/will be on this date">
                 </div>
                 <div class="form-group">
                     <label>&nbsp;</label>
@@ -87,12 +83,10 @@ const ChannelsView = (() => {
         const results = document.getElementById('channels-results');
         const platformId = document.getElementById('ch-platform').value;
         const regionId = document.getElementById('ch-region').value;
-        const date = document.getElementById('ch-date').value;
 
         const params = {};
         if (platformId) params.platformId = platformId;
         if (regionId) params.regionId = regionId;
-        if (date) params.date = date;
 
         API.showLoading(results);
         try {
