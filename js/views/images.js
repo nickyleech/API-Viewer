@@ -639,7 +639,9 @@ function getDateRange() {
         document.getElementById('audit-saved-lists').addEventListener('change', loadChannelList);
         document.getElementById('audit-clear-all').addEventListener('click', () => {
             auditSelectedChannels = [];
+            auditResults = [];
             renderSelectedChips();
+            document.getElementById('audit-results').innerHTML = '';
         });
 
         // TV/Radio filter checkboxes
