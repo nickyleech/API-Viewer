@@ -156,14 +156,6 @@ const ScheduleView = (() => {
         }
     }
 
-    function shiftDay(offset) {
-        const dateInput = document.getElementById('sch-date');
-        const dt = new Date(dateInput.value);
-        dt.setDate(dt.getDate() + offset);
-        dateInput.value = dt.toISOString().slice(0, 10);
-        loadSchedule();
-    }
-
     function renderSchedule(container, data) {
         container.innerHTML = '';
         const items = data.item || [];
@@ -196,8 +188,6 @@ const ScheduleView = (() => {
         const list = document.createElement('div');
         list.id = 'schedule-list';
         container.appendChild(list);
-
-        const channelName = (document.getElementById('sch-channel-search') || {}).value || '';
 
         items.forEach(item => {
             const card = document.createElement('div');
