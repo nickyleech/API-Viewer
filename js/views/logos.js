@@ -27,10 +27,10 @@ const LogosView = (() => {
 
         try {
             const data = await API.fetch('/channel');
-            // Deduplicate by channel ID
+            // Deduplicate by channel title (same channel can have multiple IDs across platforms)
             const seen = new Set();
             allChannels = (data.item || [])
-                .filter(ch => { if (seen.has(ch.id)) return false; seen.add(ch.id); return true; })
+                .filter(ch => { const t = (ch.title || '').toLowerCase(); if (seen.has(t)) return false; seen.add(t); return true; })
                 .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
         } catch (err) {
             API.showError(results, err.message);
