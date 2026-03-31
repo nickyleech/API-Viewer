@@ -870,7 +870,7 @@ const EpgView = (() => {
         scrollWrap.style.cssText = 'overflow-x:auto;max-width:100%';
         const table = document.createElement('table');
         table.className = 'data-table';
-        table.style.minWidth = 'max-content';
+        table.style.cssText = 'min-width:max-content;overflow:visible;border-collapse:separate;border-spacing:0';
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `<th style="${stickyNameH}">Channel Name</th><th style="text-align:center;${stickyCovH}">Coverage</th><th style="text-align:center;${stickyModeH}">Mode</th>`;
