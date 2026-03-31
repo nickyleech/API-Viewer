@@ -880,7 +880,7 @@ const EpgView = (() => {
                 const epg = v.regionEpgs[rName];
                 if (!epg) {
                     html += `<td style="text-align:center;background-color:#eeeeee !important;color:#999">-</td>`;
-                } else if (epg === mode) {
+                } else if (String(epg) === String(mode)) {
                     html += `<td style="text-align:center;background-color:#4caf50 !important"><strong style="color:#fff">${API.escapeHtml(epg)}</strong></td>`;
                 } else {
                     html += `<td style="text-align:center;background-color:#ff9800 !important"><strong style="color:#fff">${API.escapeHtml(epg)}</strong></td>`;
