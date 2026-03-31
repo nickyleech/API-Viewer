@@ -27,7 +27,11 @@ const LogosView = (() => {
 
         try {
             const data = await API.fetch('/channel');
-            allChannels = (data.item || []).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            // Deduplicate by channel ID
+            const seen = new Set();
+            allChannels = (data.item || [])
+                .filter(ch => { if (seen.has(ch.id)) return false; seen.add(ch.id); return true; })
+                .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
         } catch (err) {
             API.showError(results, err.message);
             return;
