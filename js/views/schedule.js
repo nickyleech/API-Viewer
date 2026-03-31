@@ -1,5 +1,7 @@
 const ScheduleView = (() => {
     let allChannels = [];
+    let savedListView = null;
+    let savedScrollY = 0;
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
@@ -216,15 +218,33 @@ const ScheduleView = (() => {
         container.firstElementChild.after(API.jsonToggle(data));
     }
 
+    function restoreListView() {
+        const container = document.getElementById('content');
+        if (savedListView) {
+            container.innerHTML = '';
+            container.appendChild(savedListView);
+            savedListView = null;
+            window.scrollTo(0, savedScrollY);
+        } else {
+            render(container);
+        }
+    }
+
     async function showProgrammeDetail(item) {
         const container = document.getElementById('content');
+        savedScrollY = window.scrollY;
+
+        savedListView = document.createDocumentFragment();
+        while (container.firstChild) {
+            savedListView.appendChild(container.firstChild);
+        }
+
         window.scrollTo(0, 0);
-        container.innerHTML = '';
 
         const back = document.createElement('a');
         back.className = 'back-link';
         back.innerHTML = '&larr; Back to Schedule';
-        back.addEventListener('click', () => render(container));
+        back.addEventListener('click', () => restoreListView());
         container.appendChild(back);
 
         const panel = document.createElement('div');
