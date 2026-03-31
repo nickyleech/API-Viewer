@@ -24,21 +24,17 @@ const ImagesView = (() => {
 
             <div id="tab-schedule" class="tab-panel">
                 <div class="filter-bar">
-                    <div class="form-group" style="flex:1;min-width:250px">
+                    <div class="form-group" style="min-width:250px;max-width:400px">
                         <label>Channel</label>
                         <input type="text" id="img-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
                         <div id="img-channel-dropdown" class="channel-dropdown"></div>
                         <input type="hidden" id="img-channel-id">
                     </div>
-                    <input type="hidden" id="img-start" value="${today}">
                     <div class="form-group">
-                        <label>&nbsp;</label>
+                        <label>Date</label>
                         <div style="display:flex;align-items:center;gap:8px">
                             <button id="img-prev-day" class="btn btn-sm btn-secondary">&larr;</button>
-                            <div style="position:relative;display:inline-block">
-                                <span id="img-date-label" style="font-weight:600;font-size:14px;min-width:220px;text-align:center;display:inline-block;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px"></span>
-                                <input type="date" id="img-date-picker" value="${today}" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer">
-                            </div>
+                            <input type="date" id="img-start" class="input" value="${today}" style="min-width:160px">
                             <button id="img-next-day" class="btn btn-sm btn-secondary">&rarr;</button>
                         </div>
                     </div>
@@ -152,15 +148,10 @@ const ImagesView = (() => {
 
         // Schedule tab setup
         setupChannelSearch();
-        updateDateLabel();
         document.getElementById('img-prev-day').addEventListener('click', () => shiftImgDay(-1));
         document.getElementById('img-next-day').addEventListener('click', () => shiftImgDay(1));
-        document.getElementById('img-date-picker').addEventListener('change', (e) => {
-            if (e.target.value) {
-                document.getElementById('img-start').value = e.target.value;
-                updateDateLabel();
-                if (document.getElementById('img-channel-id').value) loadProgrammes();
-            }
+        document.getElementById('img-start').addEventListener('change', () => {
+            if (document.getElementById('img-channel-id').value) loadProgrammes();
         });
         document.getElementById('img-load').addEventListener('click', loadProgrammes);
         document.getElementById('img-filter-all').addEventListener('click', () => applyFilter('all'));
@@ -296,20 +287,11 @@ function getDateRange() {
         }
     }
 
-    function updateDateLabel() {
-        const startDate = document.getElementById('img-start').value;
-        const dt = new Date(startDate);
-        const dateStr = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-        document.getElementById('img-date-label').textContent = dateStr;
-        document.getElementById('img-date-picker').value = startDate;
-    }
-
     function shiftImgDay(offset) {
         const dateInput = document.getElementById('img-start');
         const dt = new Date(dateInput.value);
         dt.setDate(dt.getDate() + offset);
         dateInput.value = dt.toISOString().slice(0, 10);
-        updateDateLabel();
         if (document.getElementById('img-channel-id').value) loadProgrammes();
     }
 
