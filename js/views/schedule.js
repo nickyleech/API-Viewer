@@ -28,7 +28,6 @@ const ScheduleView = (() => {
                     <button id="sch-search" class="btn btn-primary">Load Schedule</button>
                 </div>
             </div>
-            <div id="schedule-day-nav" style="display:none"></div>
             <div id="schedule-results"></div>
         `;
 
@@ -150,29 +149,9 @@ const ScheduleView = (() => {
         try {
             const data = await API.fetch('/schedule', params);
             renderSchedule(results, data);
-            renderDayNav(date);
         } catch (err) {
-            document.getElementById('schedule-day-nav').style.display = 'none';
             API.showError(results, err.message);
         }
-    }
-
-    function renderDayNav(currentDate) {
-        const nav = document.getElementById('schedule-day-nav');
-        const dt = new Date(currentDate);
-        const dateStr = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-        nav.style.display = '';
-        nav.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
-                <button id="sch-prev-day" class="btn btn-sm btn-secondary">&larr; Previous Day</button>
-                <span style="font-weight:600;font-size:15px;min-width:260px;text-align:center">${API.escapeHtml(dateStr)}</span>
-                <button id="sch-next-day" class="btn btn-sm btn-secondary">Next Day &rarr;</button>
-            </div>
-        `;
-
-        document.getElementById('sch-prev-day').addEventListener('click', () => shiftDay(-1));
-        document.getElementById('sch-next-day').addEventListener('click', () => shiftDay(1));
     }
 
     function shiftDay(offset) {
@@ -200,6 +179,8 @@ const ScheduleView = (() => {
         list.id = 'schedule-list';
         container.appendChild(list);
 
+        const channelName = (document.getElementById('sch-channel-search') || {}).value || '';
+
         items.forEach(item => {
             const card = document.createElement('div');
             card.className = 'card clickable';
@@ -219,6 +200,7 @@ const ScheduleView = (() => {
                     <div style="min-width:56px;text-align:center">
                         <div style="font-size:20px;font-weight:700;color:var(--color-accent)">${API.escapeHtml(time)}</div>
                         ${duration ? `<div style="font-size:12px;color:var(--color-text-secondary)">${API.escapeHtml(duration)}</div>` : ''}
+                        ${channelName ? `<div style="font-size:10px;color:var(--color-text-secondary);margin-top:4px;font-weight:600">${API.escapeHtml(channelName)}</div>` : ''}
                     </div>
                     <div style="flex:1">
                         <div class="card-title">${API.escapeHtml(item.title || 'Untitled')}</div>
