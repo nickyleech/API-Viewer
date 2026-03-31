@@ -73,9 +73,14 @@ const App = (() => {
                 return;
             }
             API.setApiKey(key);
+
+            // Save GitHub token (may be empty — that's fine)
+            const ghToken = document.getElementById('github-token-input').value.trim();
+            GitHubStorage.setToken(ghToken);
+
             modal.classList.remove('open');
             updateKeyStatus();
-            API.toast('API key saved.', 'success');
+            API.toast('Settings saved.', 'success');
             // Reload current view
             if (currentView) navigateTo(currentView);
         });
@@ -96,8 +101,10 @@ const App = (() => {
     function openApiKeyModal(firstTime) {
         const modal = document.getElementById('api-key-modal');
         const input = document.getElementById('api-key-input');
+        const ghInput = document.getElementById('github-token-input');
         const cancelBtn = document.getElementById('api-key-cancel');
         input.value = API.getApiKey();
+        ghInput.value = GitHubStorage.getToken();
         cancelBtn.style.display = firstTime && !API.hasApiKey() ? 'none' : '';
         modal.classList.add('open');
         setTimeout(() => input.focus(), 100);
@@ -106,7 +113,8 @@ const App = (() => {
     function updateKeyStatus() {
         const el = document.getElementById('api-key-status');
         if (API.hasApiKey()) {
-            el.textContent = 'Key configured';
+            const ghStatus = GitHubStorage.hasToken() ? ' | GitHub connected' : '';
+            el.textContent = 'Key configured' + ghStatus;
             el.className = 'key-status connected';
         } else {
             el.textContent = 'No key';

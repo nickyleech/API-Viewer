@@ -13,7 +13,7 @@
         </div>
         <div class="header-right">
             <span id="api-key-status" class="key-status"></span>
-            <button id="api-key-btn" class="btn btn-header">API Key</button>
+            <button id="api-key-btn" class="btn btn-header">Settings</button>
         </div>
     </header>
 
@@ -36,12 +36,23 @@
         </main>
     </div>
 
-    <!-- API Key Modal -->
+    <!-- Settings Modal -->
     <div id="api-key-modal" class="modal-overlay">
         <div class="modal">
-            <h2>Enter your API Key</h2>
-            <p>Your key is stored locally in your browser and sent directly to the PA TV API. It is never shared with any third party.</p>
-            <input type="text" id="api-key-input" class="input" placeholder="Your API key" autocomplete="off">
+            <h2>Settings</h2>
+
+            <div class="modal-section">
+                <label class="modal-label">PA API Key</label>
+                <p>Your key is stored locally in your browser and sent directly to the PA TV API. It is never shared with any third party.</p>
+                <input type="text" id="api-key-input" class="input" placeholder="Your PA API key" autocomplete="off">
+            </div>
+
+            <div class="modal-section">
+                <label class="modal-label">GitHub Token <span class="modal-optional">(optional)</span></label>
+                <p>Required to save channel lists to the shared repository. Without a token, you can only load existing lists. <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">Create a token</a></p>
+                <input type="text" id="github-token-input" class="input" placeholder="ghp_..." autocomplete="off">
+            </div>
+
             <div class="modal-actions">
                 <button id="api-key-cancel" class="btn btn-secondary">Cancel</button>
                 <button id="api-key-save" class="btn btn-primary">Save</button>
@@ -54,6 +65,7 @@
 
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/github-storage.js"></script>
     <script src="js/views/platforms.js"></script>
     <script src="js/views/channels.js"></script>
     <script src="js/views/epg.js"></script>

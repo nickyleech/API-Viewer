@@ -519,6 +519,35 @@ body {
     margin-bottom: 16px;
 }
 
+.modal-section {
+    margin-bottom: 20px;
+}
+
+.modal-section:last-of-type {
+    margin-bottom: 16px;
+}
+
+.modal-section p {
+    margin-bottom: 10px;
+}
+
+.modal-section .input {
+    margin-bottom: 0;
+}
+
+.modal-label {
+    font-size: 13px;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.modal-optional {
+    font-weight: 400;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
 .modal-actions {
     display: flex;
     justify-content: flex-end;

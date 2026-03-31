@@ -176,7 +176,7 @@ const ImagesView = (() => {
         document.getElementById('img-filter-without').addEventListener('click', () => applyFilter('without'));
 
         // Audit tab setup
-        setupAuditTab();
+        await setupAuditTab();
 
         // Load data
         await loadAllChannels();
@@ -597,9 +597,11 @@ const ImagesView = (() => {
     // AUDIT TAB
     // ============================================================
 
-    function setupAuditTab() {
-        loadSavedChannelLists();
+    async function setupAuditTab() {
         setupAuditChannelSearch();
+
+        // Load lists from GitHub (async) then populate dropdown
+        await loadSavedChannelLists();
         populateSavedListsDropdown();
 
         document.getElementById('audit-run').addEventListener('click', runAudit);
@@ -797,18 +799,49 @@ const ImagesView = (() => {
     let savedChannelLists = [];
     let activeListIdx = null;
 
-    function loadSavedChannelLists() {
+    async function loadSavedChannelLists() {
         try {
-            const stored = localStorage.getItem('pa_saved_channel_lists');
-            savedChannelLists = stored ? JSON.parse(stored) : [];
-        } catch (e) { savedChannelLists = []; }
+            const lists = await GitHubStorage.loadLists();
+            savedChannelLists = lists;
+
+            // Migrate: if localStorage has data but GitHub was empty, push it up
+            const localData = localStorage.getItem('pa_saved_channel_lists');
+            if (localData && savedChannelLists.length === 0) {
+                const localLists = JSON.parse(localData);
+                if (localLists.length > 0) {
+                    savedChannelLists = localLists;
+                    if (GitHubStorage.hasToken()) {
+                        await GitHubStorage.saveLists(savedChannelLists, 'Migrate channel lists from localStorage');
+                        API.toast('Channel lists migrated to GitHub.', 'success');
+                    }
+                }
+            }
+
+            // Keep localStorage in sync as fallback
+            localStorage.setItem('pa_saved_channel_lists', JSON.stringify(savedChannelLists));
+        } catch (err) {
+            // GitHub unavailable — fall back to localStorage
+            console.warn('GitHub storage unavailable, using localStorage:', err.message);
+            try {
+                const stored = localStorage.getItem('pa_saved_channel_lists');
+                savedChannelLists = stored ? JSON.parse(stored) : [];
+            } catch (e) { savedChannelLists = []; }
+        }
     }
 
-    function persistSavedChannelLists() {
+    async function persistSavedChannelLists(commitMessage) {
+        // Always update localStorage as immediate fallback
         try {
             localStorage.setItem('pa_saved_channel_lists', JSON.stringify(savedChannelLists));
-        } catch (e) {
-            API.toast('Failed to save to localStorage.', 'error');
+        } catch (e) { /* localStorage failed — not critical if GitHub works */ }
+
+        // Write to GitHub if token is available
+        if (GitHubStorage.hasToken()) {
+            try {
+                await GitHubStorage.saveLists(savedChannelLists, commitMessage || 'Update channel lists');
+            } catch (err) {
+                API.toast('Failed to save to GitHub: ' + err.message, 'error');
+            }
         }
     }
 
@@ -823,7 +856,10 @@ const ImagesView = (() => {
         });
     }
 
-    function saveChannelList() {
+    async function saveChannelList() {
+        const btn = document.getElementById('audit-save-list');
+        if (btn.disabled) return;
+
         if (auditSelectedChannels.length === 0) {
             API.toast('Select channels first.', 'warning');
             return;
@@ -831,27 +867,41 @@ const ImagesView = (() => {
         const name = prompt('Enter a name for this channel list:');
         if (!name || !name.trim()) return;
 
-        savedChannelLists.push({
-            name: name.trim(),
-            channels: auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }))
-        });
-        persistSavedChannelLists();
-        populateSavedListsDropdown();
-        API.toast('Channel list saved.', 'success');
+        btn.disabled = true;
+        try {
+            savedChannelLists.push({
+                name: name.trim(),
+                channels: auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }))
+            });
+            await persistSavedChannelLists(`Save channel list: ${name.trim()}`);
+            populateSavedListsDropdown();
+            API.toast('Channel list saved.', 'success');
+        } finally {
+            btn.disabled = false;
+        }
     }
 
-    function deleteChannelList() {
+    async function deleteChannelList() {
+        const btn = document.getElementById('audit-delete-list');
+        if (btn.disabled) return;
+
         const sel = document.getElementById('audit-saved-lists');
         const idx = parseInt(sel.value);
         if (isNaN(idx)) { API.toast('Select a list to delete.', 'warning'); return; }
         if (!confirm(`Delete "${savedChannelLists[idx].name}"?`)) return;
 
-        savedChannelLists.splice(idx, 1);
-        activeListIdx = null;
-        document.getElementById('audit-update-list').disabled = true;
-        persistSavedChannelLists();
-        populateSavedListsDropdown();
-        API.toast('List deleted.', 'success');
+        btn.disabled = true;
+        try {
+            const deletedName = savedChannelLists[idx].name;
+            savedChannelLists.splice(idx, 1);
+            activeListIdx = null;
+            document.getElementById('audit-update-list').disabled = true;
+            await persistSavedChannelLists(`Delete channel list: ${deletedName}`);
+            populateSavedListsDropdown();
+            API.toast('List deleted.', 'success');
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     function loadChannelList() {
@@ -870,7 +920,8 @@ const ImagesView = (() => {
         API.toast(`Loaded "${savedChannelLists[idx].name}".`, 'success');
     }
 
-    function updateChannelList() {
+    async function updateChannelList() {
+        const btn = document.getElementById('audit-update-list');
         if (activeListIdx === null || !savedChannelLists[activeListIdx]) {
             API.toast('No list selected to update.', 'warning');
             return;
@@ -879,13 +930,18 @@ const ImagesView = (() => {
             API.toast('Select channels first.', 'warning');
             return;
         }
-        const name = savedChannelLists[activeListIdx].name;
-        savedChannelLists[activeListIdx].channels = auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }));
-        persistSavedChannelLists();
-        populateSavedListsDropdown();
-        // Re-select the active list in the dropdown
-        document.getElementById('audit-saved-lists').value = activeListIdx;
-        API.toast(`Updated "${name}".`, 'success');
+
+        btn.disabled = true;
+        try {
+            const name = savedChannelLists[activeListIdx].name;
+            savedChannelLists[activeListIdx].channels = auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }));
+            await persistSavedChannelLists(`Update channel list: ${name}`);
+            populateSavedListsDropdown();
+            document.getElementById('audit-saved-lists').value = activeListIdx;
+            API.toast(`Updated "${name}".`, 'success');
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     // --- Audit execution ---

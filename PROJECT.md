@@ -6,7 +6,8 @@ A client-side web application for exploring the Press Association (PA) TV API (v
 
 - **Vanilla JS** with IIFE module pattern (`const XxxView = (() => { ... return { render }; })()`)
 - **SheetJS** (CDN) for multi-sheet Excel export
-- **localStorage** for API key and saved channel lists persistence
+- **GitHub Contents API** for shared, version-controlled channel list storage (`data/channel-lists.json`)
+- **localStorage** for API key, GitHub token, and offline fallback
 - **PA TV API v2** at `https://tv.api.pressassociation.io/v2`, authenticated via `apikey` header
 
 ## File Structure
@@ -15,7 +16,7 @@ A client-side web application for exploring the Press Association (PA) TV API (v
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Single-page app shell — header, sidebar nav, content area, API key modal, toast container. Loads all scripts and the SheetJS CDN. |
+| `index.html` | Single-page app shell — header, sidebar nav, content area, Settings modal, toast container. Loads all scripts and the SheetJS CDN. |
 | `PROJECT.md` | This file — project documentation. |
 
 ### `css/`
@@ -29,7 +30,8 @@ A client-side web application for exploring the Press Association (PA) TV API (v
 | File | Purpose |
 |------|---------|
 | `api.js` | **API helper module** (`API`). Handles all communication with the PA TV API. Provides `fetch()` for API calls, API key management (`getApiKey`, `setApiKey`, `hasApiKey`), and shared UI utilities: `showLoading`, `showError`, `showEmpty`, `toast`, `escapeHtml`, `jsonToggle` (collapsible raw JSON viewer), and `extractImages` (pulls image URLs from media arrays). |
-| `app.js` | **Application controller** (`App`). Registers all views, handles sidebar navigation and hash-based routing, manages the API key modal, and defaults to the Image Viewer on load. |
+| `github-storage.js` | **GitHub storage module** (`GitHubStorage`). Reads and writes `data/channel-lists.json` via the GitHub Contents API. Provides token management (`getToken`, `setToken`, `hasToken`) and high-level `loadLists()` / `saveLists()` methods. Each save creates a commit in the repo. |
+| `app.js` | **Application controller** (`App`). Registers all views, handles sidebar navigation and hash-based routing, manages the Settings modal (API key + GitHub token), and defaults to the Image Viewer on load. |
 
 ### `js/views/`
 
@@ -69,8 +71,10 @@ Audits image coverage across multiple channels over a date range.
 - Selected channels appear as removable chips
 
 **Saved channel lists:**
-- Save the current selection as a named list (stored in `localStorage` under `pa_saved_channel_lists`)
-- Load, update, or delete saved lists
+- Save the current selection as a named list (stored in `data/channel-lists.json` in the GitHub repo via the Contents API)
+- Load, update, or delete saved lists — each change creates a descriptive commit
+- Lists are shared across all users with repo access
+- Falls back to `localStorage` if GitHub is unavailable; existing localStorage lists auto-migrate to GitHub on first load with a token
 - Update button overwrites the active list with the current selection
 
 **Audit execution:**
@@ -88,6 +92,26 @@ Browse programme images for a single channel on a given date.
 - Filter results by: All / With Images / Without Images
 - Day navigation (previous/next day buttons)
 - Click a programme to see full detail: broadcast info, images gallery with lightbox, raw JSON toggle
+
+### `data/`
+
+| File | Purpose |
+|------|---------|
+| `channel-lists.json` | Saved channel lists, managed via the GitHub Contents API. Format: `{ "version": 1, "lists": [{ "name": "...", "channels": [{ "id": "...", "title": "..." }] }] }`. Each save/update/delete creates a commit. |
+
+## GitHub Storage
+
+Channel lists are stored as a JSON file in the repository rather than in browser localStorage. This means lists are shared across team members and persist across browsers/devices.
+
+**Setup:** In Settings, provide a fine-grained GitHub Personal Access Token scoped to this repository with "Contents: Read and write" permission. Without a token, existing lists can be loaded (if the repo is public) but not saved.
+
+**How it works:**
+- `GitHubStorage.loadLists()` reads `data/channel-lists.json` via `GET /repos/{owner}/{repo}/contents/{path}`
+- `GitHubStorage.saveLists()` writes the file via `PUT`, creating a commit with a descriptive message
+- The GitHub API requires the file's current SHA for updates, tracked internally to prevent conflicts
+- localStorage is always kept in sync as an offline fallback
+
+**Migration:** If a user has existing lists in localStorage and configures a GitHub token, lists are automatically pushed to GitHub on the next page load.
 
 ## Data Conventions
 
