@@ -436,6 +436,7 @@ function getDateRange() {
 
     function showProgrammeDetail(item) {
         const container = document.getElementById('content');
+        window.scrollTo(0, 0);
 
         savedListView = document.createDocumentFragment();
         while (container.firstChild) {
@@ -881,7 +882,7 @@ function getDateRange() {
 
     function populateSavedListsDropdown() {
         const sel = document.getElementById('audit-saved-lists');
-        sel.innerHTML = '<option value="">Select a list...</option>';
+        sel.innerHTML = '<option value="">Select a list...</option><option value="__none__">No list</option>';
         savedChannelLists.forEach((list, idx) => {
             const opt = document.createElement('option');
             opt.value = idx;
@@ -947,13 +948,17 @@ function getDateRange() {
 
     function loadChannelList() {
         const sel = document.getElementById('audit-saved-lists');
-        const idx = parseInt(sel.value);
-        if (isNaN(idx)) {
+        if (sel.value === '__none__' || sel.value === '') {
             activeListIdx = null;
             document.getElementById('audit-update-list').disabled = true;
             document.getElementById('audit-rename-list').disabled = true;
+            if (sel.value === '__none__') {
+                auditSelectedChannels = [];
+                renderSelectedChips();
+            }
             return;
         }
+        const idx = parseInt(sel.value);
 
         activeListIdx = idx;
         auditSelectedChannels = [...savedChannelLists[idx].channels];

@@ -223,6 +223,7 @@ const ScheduleView = (() => {
 
     async function showProgrammeDetail(item) {
         const container = document.getElementById('content');
+        window.scrollTo(0, 0);
         container.innerHTML = '';
 
         const back = document.createElement('a');
