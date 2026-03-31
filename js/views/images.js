@@ -15,7 +15,6 @@ const ImagesView = (() => {
         container.innerHTML = `
             <div class="view-header">
                 <h2>Image Viewer</h2>
-                <p>Browse programme images by schedule</p>
             </div>
             <div class="view-tabs">
                 <button class="view-tab active" data-tab="audit">Image Audit</button>
