@@ -781,6 +781,7 @@ const ImagesView = (() => {
 
         if (auditSelectedChannels.length === 0) {
             wrapper.style.display = 'none';
+            renderChannelBrowser();
             return;
         }
 
@@ -875,18 +876,20 @@ const ImagesView = (() => {
             const newIdx = savedChannelLists.length;
             savedChannelLists.push({
                 name: name.trim(),
-                channels: auditSelectedChannels.map(ch => ({ id: ch.id, title: ch.title }))
+                channels: []
             });
             await persistSavedChannelLists(`Add channel list: ${name.trim()}`);
             populateSavedListsDropdown();
 
-            // Auto-select the new list
+            // Auto-select the new list and clear channel selections
             activeListIdx = newIdx;
             document.getElementById('audit-saved-lists').value = newIdx;
             document.getElementById('audit-update-list').disabled = false;
             document.getElementById('audit-rename-list').disabled = false;
+            auditSelectedChannels = [];
+            renderSelectedChips();
 
-            API.toast(`List "${name.trim()}" added.`, 'success');
+            API.toast(`List "${name.trim()}" added. Select channels and click Update to populate it.`, 'success');
         } finally {
             btn.disabled = false;
         }
