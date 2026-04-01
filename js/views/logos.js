@@ -167,15 +167,49 @@ const LogosView = (() => {
             return;
         }
 
+        const withLogo = [];
+        const withoutLogo = [];
+        channels.forEach(ch => {
+            const imgs = API.extractImages(ch.media);
+            (imgs.length > 0 ? withLogo : withoutLogo).push(ch);
+        });
+
         const info = document.createElement('div');
         info.className = 'results-info';
-        info.textContent = `Showing ${channels.length} channel(s)`;
+        info.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap';
+        info.innerHTML = `<span>Showing ${channels.length} channel(s)</span>`;
+
+        if (withoutLogo.length > 0 && channels.length > 1) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'btn btn-sm btn-secondary';
+            toggleBtn.textContent = `Show ${withoutLogo.length} missing logo(s)`;
+            toggleBtn.style.cssText = 'font-size:11px;padding:3px 10px';
+            let showingMissing = false;
+
+            toggleBtn.addEventListener('click', () => {
+                showingMissing = !showingMissing;
+                if (showingMissing) {
+                    toggleBtn.textContent = `Show all ${channels.length} channel(s)`;
+                    cards.forEach(({ card, hasLogo }) => {
+                        card.style.display = hasLogo ? 'none' : 'flex';
+                    });
+                } else {
+                    toggleBtn.textContent = `Show ${withoutLogo.length} missing logo(s)`;
+                    cards.forEach(({ card }) => {
+                        card.style.display = 'flex';
+                    });
+                }
+            });
+            info.appendChild(toggleBtn);
+        }
+
         container.appendChild(info);
 
         const grid = document.createElement('div');
         grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:16px;padding:8px 0';
         container.appendChild(grid);
 
+        const cards = [];
         channels.forEach(ch => {
             const imgs = API.extractImages(ch.media);
             const logo = imgs.length > 0 ? imgs[0] : null;
@@ -211,6 +245,7 @@ const LogosView = (() => {
             }
 
             grid.appendChild(card);
+            cards.push({ card, hasLogo: !!logo });
         });
     }
 

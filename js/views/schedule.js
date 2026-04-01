@@ -267,8 +267,22 @@ const ScheduleView = (() => {
         const certification = item.certification || asset.certification || {};
         const certEntries = Object.entries(certification).map(([k, v]) => `${k}: ${v}`).join(', ');
 
+        const channelName = (document.getElementById('sch-channel-search') || {}).value || '';
+        const assetMeta = asset.meta || {};
+        const seasonRelated = (asset.related || []).find(r => r.type === 'season');
+        const seasonNum = seasonRelated ? seasonRelated.number : null;
+        const episodeNum = assetMeta.episode || asset.number || null;
+        const episodeTotal = assetMeta.episodeTotal || asset.total || null;
+        const episodeInfo = [
+            seasonNum ? `Season ${seasonNum}` : '',
+            episodeNum ? `Episode ${episodeNum}${episodeTotal ? ` of ${episodeTotal}` : ''}` : ''
+        ].filter(Boolean).join(', ');
+
         panel.innerHTML = `
+            ${channelName ? `<div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px">${API.escapeHtml(channelName)}</div>` : ''}
             <h3>${API.escapeHtml(item.title || 'Untitled')}</h3>
+            ${asset.title ? `<div style="font-size:15px;color:var(--color-text-secondary);margin:-8px 0 12px">${API.escapeHtml(asset.title)}</div>` : ''}
+            ${episodeInfo ? `<div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${API.escapeHtml(episodeInfo)}</div>` : ''}
 
             <div class="detail-row"><div class="detail-label">Schedule ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(item.id || '')}</code></div></div>
             <div class="detail-row"><div class="detail-label">Broadcast</div><div class="detail-value">${API.escapeHtml(timeStr)}</div></div>
@@ -282,6 +296,51 @@ const ScheduleView = (() => {
             ${summary.medium ? `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">${API.escapeHtml(summary.medium)}</div></div>` : ''}
             ${summary.long ? `<div class="detail-row"><div class="detail-label">Full Description</div><div class="detail-value">${API.escapeHtml(summary.long)}</div></div>` : ''}
         `;
+
+        // --- Helper to add a detail row (supports empty-field hiding) ---
+        function addRow(label, valueHtml, hasData) {
+            const row = document.createElement('div');
+            row.className = 'detail-row';
+            if (!hasData) row.classList.add('empty-field');
+            row.innerHTML = `<div class="detail-label">${API.escapeHtml(label)}</div><div class="detail-value">${hasData ? valueHtml : '<span style="color:var(--color-text-secondary);font-style:italic">—</span>'}</div>`;
+            panel.appendChild(row);
+        }
+
+        // VOD availability
+        const vod = asset.vod || {};
+        const vodEntries = Object.entries(vod);
+        const vodHtml = vodEntries.map(([platform, info]) => {
+            const parts = [`<strong>${API.escapeHtml(platform)}</strong>`];
+            if (info.region) parts.push(API.escapeHtml(info.region));
+            if (info.start) parts.push('from ' + API.escapeHtml(new Date(info.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })));
+            return `<span class="badge badge-green" style="margin:2px;padding:4px 8px">${parts.join(' — ')}</span>`;
+        }).join(' ');
+        addRow('VOD', vodHtml, vodEntries.length > 0);
+
+        // Soundtrack
+        const soundtrack = asset.soundtrack || [];
+        const soundtrackHtml = soundtrack.map(s => `<span class="badge badge-gray">${API.escapeHtml(typeof s === 'string' ? s : (s.name || JSON.stringify(s)))}</span>`).join(' ');
+        addRow('Soundtrack', soundtrackHtml, soundtrack.length > 0);
+
+        // Locations
+        const locations = asset.locations || [];
+        const locationsHtml = locations.map(l => `<span class="badge badge-gray">${API.escapeHtml(typeof l === 'string' ? l : (l.name || JSON.stringify(l)))}</span>`).join(' ');
+        addRow('Locations', locationsHtml, locations.length > 0);
+
+        // Keywords
+        const keywords = asset.keywords || [];
+        const keywordsHtml = keywords.map(k => `<span class="badge badge-gray">${API.escapeHtml(typeof k === 'string' ? k : (k.name || JSON.stringify(k)))}</span>`).join(' ');
+        addRow('Keywords', keywordsHtml, keywords.length > 0);
+
+        // Mood
+        const mood = asset.mood || [];
+        const moodHtml = mood.map(m => `<span class="badge badge-gray">${API.escapeHtml(typeof m === 'string' ? m : (m.name || JSON.stringify(m)))}</span>`).join(' ');
+        addRow('Mood', moodHtml, mood.length > 0);
+
+        // Themes
+        const themes = asset.themes || [];
+        const themesHtml = themes.map(t => `<span class="badge badge-gray">${API.escapeHtml(typeof t === 'string' ? t : (t.name || JSON.stringify(t)))}</span>`).join(' ');
+        addRow('Themes', themesHtml, themes.length > 0);
 
         // Show images from asset media
         const imgs = API.extractImages(asset.media);
@@ -315,6 +374,47 @@ const ScheduleView = (() => {
             subRow.className = 'detail-row';
             subRow.innerHTML = `<div class="detail-label">Subject Codes</div><div class="detail-value">${codes.map(c => `<code style="font-size:12px;margin:2px;padding:2px 6px;background:var(--color-bg);border-radius:3px">${API.escapeHtml(c)}</code>`).join(' ')}</div>`;
             panel.appendChild(subRow);
+        }
+
+        // --- Contributors (hidden by default, toggled by checkbox) ---
+        const contributors = asset.contributor || [];
+        if (contributors.length > 0) {
+            const contSection = document.createElement('div');
+            contSection.className = 'detail-row';
+            contSection.style.cssText = 'flex-direction:column;gap:8px';
+
+            const contToggle = document.createElement('label');
+            contToggle.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--color-text-secondary)';
+            contToggle.innerHTML = `<input type="checkbox" id="sch-show-contributors" style="cursor:pointer"> Show Contributors (${contributors.length})`;
+            contSection.appendChild(contToggle);
+
+            const contList = document.createElement('div');
+            contList.style.display = 'none';
+            contList.innerHTML = contributors.map(c => {
+                const roles = (c.role || []).map(r => r.replace(/-/g, ' ')).join(', ');
+                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><strong style="min-width:160px">${API.escapeHtml(c.name)}</strong><span class="badge badge-purple" style="text-transform:capitalize">${API.escapeHtml(roles)}</span><code style="font-size:11px;color:var(--color-text-secondary);user-select:all">${API.escapeHtml(c.id || '')}</code></div>`;
+            }).join('');
+            contSection.appendChild(contList);
+
+            contToggle.querySelector('input').addEventListener('change', (e) => {
+                contList.style.display = e.target.checked ? 'block' : 'none';
+            });
+
+            panel.appendChild(contSection);
+        }
+
+        // --- Show empty fields toggle ---
+        const emptyFields = panel.querySelectorAll('.empty-field');
+        if (emptyFields.length > 0) {
+            emptyFields.forEach(el => el.style.display = 'none');
+
+            const toggleRow = document.createElement('div');
+            toggleRow.style.cssText = 'margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border)';
+            toggleRow.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--color-text-secondary)"><input type="checkbox" id="sch-show-empty" style="cursor:pointer"> Show empty fields (${emptyFields.length})</label>`;
+            toggleRow.querySelector('input').addEventListener('change', (e) => {
+                emptyFields.forEach(el => el.style.display = e.target.checked ? 'flex' : 'none');
+            });
+            panel.appendChild(toggleRow);
         }
 
         panel.firstElementChild.after(API.jsonToggle(item));
