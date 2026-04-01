@@ -13,7 +13,6 @@ const ReviewView = (() => {
         toolbar.className = 'review-toolbar';
         toolbar.innerHTML = `
             <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="pending">Pending</button>
             <button class="filter-btn" data-filter="checking">Being Checked</button>
             <span style="flex:1"></span>
             <button class="btn btn-sm btn-secondary review-download-btn">Download Excel</button>
@@ -56,11 +55,14 @@ const ReviewView = (() => {
 
     function renderList(container) {
         const allItems = ReviewStore.getAll();
+        allItems.sort((a, b) => {
+            const da = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+            const db = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+            return da - db;
+        });
         let items = allItems;
 
-        if (currentFilter === 'pending') {
-            items = allItems.filter(i => !i.checking);
-        } else if (currentFilter === 'checking') {
+        if (currentFilter === 'checking') {
             items = allItems.filter(i => i.checking);
         }
 
@@ -74,7 +76,7 @@ const ReviewView = (() => {
             return;
         }
 
-        container.innerHTML = `<div class="results-info">${items.length} item${items.length !== 1 ? 's' : ''}${currentFilter !== 'all' ? ' (' + currentFilter + ')' : ''}</div>`;
+        container.innerHTML = `<div class="results-info">${items.length} item${items.length !== 1 ? 's' : ''}${currentFilter === 'checking' ? ' (being checked)' : ''}</div>`;
 
         items.forEach(item => {
             const card = document.createElement('div');
