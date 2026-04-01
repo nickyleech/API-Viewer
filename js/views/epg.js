@@ -1331,7 +1331,7 @@ const EpgView = (() => {
                 if (!group || group.length === 0) return;
                 const uniqueEpgs = [...new Set(group.map(r => r.epg))];
                 if (uniqueEpgs.length === 1) {
-                    rows.push({ label: country, epg: uniqueEpgs[0], isCountry: true });
+                    rows.push({ label: country, epg: uniqueEpgs[0], isCountry: true, sourceRegions: group.map(r => r.region) });
                 } else {
                     group.forEach(r => {
                         rows.push({ label: r.region, epg: r.epg, isCountry: false, country });
@@ -1420,7 +1420,7 @@ const EpgView = (() => {
                     const country = rowCountryMap[label];
                     if (country) {
                         const consolidated = pData.rows.find(r => r.isCountry && r.label === country);
-                        if (consolidated) {
+                        if (consolidated && consolidated.sourceRegions && consolidated.sourceRegions.includes(label)) {
                             map[label] = consolidated.epg;
                             return;
                         }
