@@ -2,10 +2,12 @@ const GitHubStorage = (() => {
     const OWNER = 'nickyleech';
     const REPO = 'API-Viewer';
     const FILE_PATH = 'data/channel-lists.json';
+    const REVIEW_FILE_PATH = 'data/review-items.json';
     const API_BASE = 'https://api.github.com';
     const TOKEN_KEY = 'pa_github_token';
 
     let currentSha = null;
+    let reviewSha = null;
 
     // --- Token management ---
 
@@ -29,10 +31,10 @@ const GitHubStorage = (() => {
         localStorage.removeItem(TOKEN_KEY);
     }
 
-    // --- GitHub Contents API ---
+    // --- GitHub Contents API (generic helpers) ---
 
-    async function readFile() {
-        const url = `${API_BASE}/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+    async function _readFile(filePath) {
+        const url = `${API_BASE}/repos/${OWNER}/${REPO}/contents/${filePath}`;
         const headers = { 'Accept': 'application/vnd.github.v3+json' };
         const token = getToken();
         if (token) {
@@ -42,8 +44,7 @@ const GitHubStorage = (() => {
         const response = await fetch(url, { headers });
 
         if (response.status === 404) {
-            currentSha = null;
-            return null;
+            return { content: null, sha: null };
         }
 
         if (!response.ok) {
@@ -51,31 +52,30 @@ const GitHubStorage = (() => {
         }
 
         const data = await response.json();
-        currentSha = data.sha;
 
         // Decode base64 content (GitHub inserts newlines every 60 chars)
         const raw = atob(data.content.replace(/\n/g, ''));
         const content = decodeURIComponent(escape(raw));
-        return JSON.parse(content);
+        return { content: JSON.parse(content), sha: data.sha };
     }
 
-    async function writeFile(data, message) {
+    async function _writeFile(filePath, sha, data, message) {
         const token = getToken();
         if (!token) {
-            throw new Error('GitHub token required to save channel lists.');
+            throw new Error('GitHub token required to save data.');
         }
 
-        const url = `${API_BASE}/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+        const url = `${API_BASE}/repos/${OWNER}/${REPO}/contents/${filePath}`;
         const jsonStr = JSON.stringify(data, null, 2);
         const content = btoa(unescape(encodeURIComponent(jsonStr)));
 
         const body = {
-            message: message || 'Update channel lists',
+            message: message || 'Update data',
             content: content
         };
 
-        if (currentSha) {
-            body.sha = currentSha;
+        if (sha) {
+            body.sha = sha;
         }
 
         const response = await fetch(url, {
@@ -101,27 +101,44 @@ const GitHubStorage = (() => {
         }
 
         const result = await response.json();
-        currentSha = result.content.sha;
-        return result;
+        return result.content.sha;
     }
 
-    // --- High-level API ---
+    // --- Channel Lists API ---
 
     async function loadLists() {
-        const data = await readFile();
-        if (!data || !data.lists) {
+        const { content, sha } = await _readFile(FILE_PATH);
+        currentSha = sha;
+        if (!content || !content.lists) {
             return [];
         }
-        return data.lists;
+        return content.lists;
     }
 
     async function saveLists(lists, commitMessage) {
         const data = { version: 1, lists: lists };
-        await writeFile(data, commitMessage);
+        currentSha = await _writeFile(FILE_PATH, currentSha, data, commitMessage);
+    }
+
+    // --- Review Items API ---
+
+    async function loadReviewItems() {
+        const { content, sha } = await _readFile(REVIEW_FILE_PATH);
+        reviewSha = sha;
+        if (!content || !content.items) {
+            return [];
+        }
+        return content.items;
+    }
+
+    async function saveReviewItems(items, commitMessage) {
+        const data = { version: 1, items: items };
+        reviewSha = await _writeFile(REVIEW_FILE_PATH, reviewSha, data, commitMessage);
     }
 
     return {
         getToken, setToken, hasToken, removeToken,
-        loadLists, saveLists
+        loadLists, saveLists,
+        loadReviewItems, saveReviewItems
     };
 })();

@@ -22,7 +22,7 @@ const App = (() => {
             updateKeyStatus();
         }
 
-        ReviewStore.updateBadge();
+        ReviewStore.init();
 
         // Navigate from hash or default to platforms
         const hash = window.location.hash.slice(1) || 'images';

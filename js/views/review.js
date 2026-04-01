@@ -1,7 +1,7 @@
 const ReviewView = (() => {
     let currentFilter = 'all';
 
-    function render(container) {
+    async function render(container) {
         currentFilter = 'all';
 
         const header = document.createElement('div');
@@ -50,6 +50,9 @@ const ReviewView = (() => {
             API.toast('All review items cleared.', 'success');
         });
 
+        // Fetch latest from GitHub before rendering
+        API.showLoading(listContainer);
+        await ReviewStore.init();
         renderList(listContainer);
     }
 
