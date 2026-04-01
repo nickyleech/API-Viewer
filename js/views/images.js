@@ -442,6 +442,7 @@ function getDateRange() {
     function showProgrammeDetail(item, externalOpts) {
         const container = document.getElementById('content');
         const channelName = (externalOpts && externalOpts.channelName) || (document.getElementById('img-channel-search') || {}).value || '';
+        const channelId = (externalOpts && externalOpts.channelId) || (document.getElementById('img-channel-id') || {}).value || '';
         window.scrollTo(0, 0);
 
         if (externalOpts && externalOpts.onBack) {
@@ -643,7 +644,6 @@ function getDateRange() {
         renderImageGallery(container, images, item.title);
 
         panel.firstElementChild.after(API.jsonToggle(item, () => {
-            const channelId = (document.getElementById('img-channel-id') || {}).value || '';
             ReviewStore.openReviewModal(item, channelName, 'images', channelId);
         }));
     }
