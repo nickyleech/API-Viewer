@@ -75,15 +75,11 @@ const EpgView = (() => {
 
             <div id="tab-channel-lookup" class="tab-panel">
                 <div class="filter-bar">
-                    <div class="form-group" style="min-width:250px">
-                        <label>Search</label>
-                        <input type="text" id="lookup-search" class="input" placeholder="Filter by channel name..." style="width:100%">
-                    </div>
-                    <div class="form-group" style="flex:1;min-width:300px">
+                    <div class="form-group" style="min-width:300px;max-width:400px">
                         <label>Channel</label>
-                        <select id="lookup-channel-id" class="select" style="width:100%">
-                            <option value="">Loading channels...</option>
-                        </select>
+                        <input type="text" id="lookup-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
+                        <div id="lookup-channel-dropdown" class="channel-dropdown"></div>
+                        <input type="hidden" id="lookup-channel-id">
                     </div>
                     <div class="form-group">
                         <label>&nbsp;</label>
@@ -115,7 +111,7 @@ const EpgView = (() => {
 
         // Channel Lookup tab
         document.getElementById('lookup-btn').addEventListener('click', lookupChannel);
-        document.getElementById('lookup-search').addEventListener('input', filterLookupChannels);
+        setupLookupChannelSearch();
 
         await loadPlatforms();
         loadLookupChannels();
@@ -1076,30 +1072,75 @@ const EpgView = (() => {
     // --- Channel Lookup tab ---
 
     async function loadLookupChannels() {
-        const sel = document.getElementById('lookup-channel-id');
         try {
             const data = await API.fetch('/channel');
             lookupAllChannels = (data.item || []).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-            populateLookupSelect(lookupAllChannels);
         } catch (err) {
-            sel.innerHTML = '<option value="">Error loading channels</option>';
+            lookupAllChannels = [];
         }
     }
 
-    function populateLookupSelect(channels) {
-        const sel = document.getElementById('lookup-channel-id');
-        sel.innerHTML = '<option value="">-- Select a Channel --</option>';
-        channels.forEach(ch => {
-            sel.innerHTML += `<option value="${API.escapeHtml(ch.id)}">${API.escapeHtml(ch.title)}</option>`;
-        });
-    }
+    function setupLookupChannelSearch() {
+        const input = document.getElementById('lookup-channel-search');
+        const dropdown = document.getElementById('lookup-channel-dropdown');
+        const hiddenId = document.getElementById('lookup-channel-id');
 
-    function filterLookupChannels() {
-        const query = (document.getElementById('lookup-search').value || '').toLowerCase().trim();
-        const filtered = query
-            ? lookupAllChannels.filter(ch => (ch.title || '').toLowerCase().includes(query))
-            : lookupAllChannels;
-        populateLookupSelect(filtered);
+        input.addEventListener('focus', () => { input.select(); });
+        input.addEventListener('input', () => {
+            hiddenId.value = '';
+            showLookupDropdown();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#lookup-channel-search') && !e.target.closest('#lookup-channel-dropdown')) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        function showLookupDropdown() {
+            const query = (input.value || '').toLowerCase().trim();
+
+            if (lookupAllChannels.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            if (!query) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = lookupAllChannels.filter(ch => (ch.title || '').toLowerCase().includes(query));
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            dropdown.innerHTML = '';
+            filtered.slice(0, 50).forEach(ch => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
+                item.addEventListener('click', () => {
+                    input.value = ch.title;
+                    hiddenId.value = ch.id;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(item);
+            });
+
+            if (filtered.length > 50) {
+                const more = document.createElement('div');
+                more.className = 'dropdown-empty';
+                more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
+                dropdown.appendChild(more);
+            }
+
+            dropdown.style.display = 'block';
+        }
     }
 
     async function lookupChannel() {
@@ -1107,7 +1148,7 @@ const EpgView = (() => {
         const results = document.getElementById('lookup-results');
 
         if (!channelId) {
-            API.toast('Please select a channel.', 'warning');
+            API.toast('Please select a channel from the dropdown.', 'warning');
             return;
         }
 
