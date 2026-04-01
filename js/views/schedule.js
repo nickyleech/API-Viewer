@@ -2,6 +2,7 @@ const ScheduleView = (() => {
     let allChannels = [];
     let savedListView = null;
     let savedScrollY = 0;
+    let currentChannelId = '';
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
@@ -127,6 +128,7 @@ const ScheduleView = (() => {
     async function loadSchedule() {
         const results = document.getElementById('schedule-results');
         const channelId = document.getElementById('sch-channel-id').value;
+        currentChannelId = channelId;
         const date = document.getElementById('sch-date').value;
 
         if (!channelId) {
@@ -441,8 +443,7 @@ const ScheduleView = (() => {
         }
 
         panel.firstElementChild.after(API.jsonToggle(item, () => {
-            const channelId = (document.getElementById('sch-channel-id') || {}).value || '';
-            ReviewStore.openReviewModal(item, channelName, 'schedule', channelId);
+            ReviewStore.openReviewModal(item, channelName, 'schedule', currentChannelId);
         }));
     }
 

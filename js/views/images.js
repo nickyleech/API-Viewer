@@ -4,6 +4,7 @@ const ImagesView = (() => {
     let scheduleItems = [];
     let savedListView = null;
     let currentFilter = 'all';
+    let currentChannelId = '';
 
     // === Audit tab state ===
     let auditSelectedChannels = [];
@@ -259,6 +260,7 @@ function getDateRange() {
     async function loadProgrammes() {
         const results = document.getElementById('img-results');
         const channelId = document.getElementById('img-channel-id').value;
+        currentChannelId = channelId;
 
         if (!channelId) {
             API.toast('Please select a channel.', 'warning');
@@ -442,7 +444,7 @@ function getDateRange() {
     function showProgrammeDetail(item, externalOpts) {
         const container = document.getElementById('content');
         const channelName = (externalOpts && externalOpts.channelName) || (document.getElementById('img-channel-search') || {}).value || '';
-        const channelId = (externalOpts && externalOpts.channelId) || (document.getElementById('img-channel-id') || {}).value || '';
+        const channelId = (externalOpts && externalOpts.channelId) || currentChannelId || '';
         window.scrollTo(0, 0);
 
         if (externalOpts && externalOpts.onBack) {
