@@ -2,18 +2,6 @@
   "version": 1,
   "items": [
     {
-      "id": "f8e211dc-d6c7-5da9-9bd4-dd18068aa820",
-      "title": "A Place in the Sun: Home or Away",
-      "note": "Test",
-      "channel": "4seven",
-      "channelId": "",
-      "dateTime": "2026-04-01T12:00:00.000Z",
-      "assetId": "ae2d40f2-29c9-5c98-86ec-3546abfc8a59",
-      "source": "schedule",
-      "addedAt": "2026-04-01T20:22:57.704Z",
-      "checking": false
-    },
-    {
       "id": "3f7ae5fd-49fd-56d4-9625-e218f430ddea",
       "title": "Sounds of the 90s with Fearne Cotton",
       "note": "Image looks old",
