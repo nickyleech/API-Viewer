@@ -1526,9 +1526,10 @@ const EpgView = (() => {
                 // Compute mode EPG for each (channelId, platformIndex) across this country's regions
                 const modeMap = {}; // chId → [modeEpg per platform]
                 channelIds.forEach(chId => {
-                    modeMap[chId] = platformLookup.map((_, pIdx) => {
+                    modeMap[chId] = platformLookup.map((map, pIdx) => {
                         const counts = {};
                         countryRegions.forEach(region => {
+                            if (!map[region] && !noRegionPlatforms.has(pIdx)) return;
                             const key = getEpg(region, chId, pIdx) || ABSENT;
                             counts[key] = (counts[key] || 0) + 1;
                         });
@@ -1579,7 +1580,8 @@ const EpgView = (() => {
                     const channelExceptions = [];
                     channelIds.forEach(chId => {
                         const modes = modeMap[chId];
-                        const hasDiff = platformLookup.some((_, pIdx) => {
+                        const hasDiff = platformLookup.some((map, pIdx) => {
+                            if (!map[region] && !noRegionPlatforms.has(pIdx)) return false;
                             const actual = getEpg(region, chId, pIdx);
                             return actual !== modes[pIdx];
                         });
@@ -1600,7 +1602,11 @@ const EpgView = (() => {
                             tbody += '<td></td>';
                         }
                         if (multiChannel) tbody += `<td style="font-size:13px">${API.escapeHtml(title)}</td>`;
-                        platformLookup.forEach((_, pIdx) => {
+                        platformLookup.forEach((map, pIdx) => {
+                            if (!map[region] && !noRegionPlatforms.has(pIdx)) {
+                                tbody += '<td style="text-align:center;color:var(--color-text-secondary)">-</td>';
+                                return;
+                            }
                             const actual = getEpg(region, chId, pIdx);
                             const isDiff = actual !== modes[pIdx];
                             if (actual) {
