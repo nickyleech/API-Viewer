@@ -1,17 +1,4 @@
 {
   "version": 1,
-  "items": [
-    {
-      "id": "dbabd037-f6c6-59ee-8f31-7cfb4b96c11d",
-      "title": "Owain Wyn Evans",
-      "note": "Review image",
-      "channel": "BBC Radio 2",
-      "channelId": "",
-      "dateTime": "2026-04-01T03:00:00.000Z",
-      "assetId": "187cd5e5-e602-5a85-b619-5bceb6f0726f",
-      "source": "schedule",
-      "addedAt": "2026-04-01T20:15:16.668Z",
-      "checking": false
-    }
-  ]
+  "items": []
 }
