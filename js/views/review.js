@@ -107,7 +107,7 @@ const ReviewView = (() => {
                 </div>
                 ${item.note ? `<div class="review-card-note">${API.escapeHtml(item.note)}</div>` : ''}
                 <div class="review-card-actions">
-                    <button class="btn btn-sm btn-secondary review-toggle-btn">${item.checking ? 'Mark Pending' : 'Mark Being Checked'}</button>
+                    <button class="btn btn-sm btn-secondary review-toggle-btn">${item.checking ? 'Uncheck' : 'Mark Being Checked'}</button>
                     <button class="btn btn-sm btn-secondary btn-delete review-delete-btn">Delete</button>
                     <span class="review-card-timestamp">Added ${API.escapeHtml(addedAt)}</span>
                 </div>
