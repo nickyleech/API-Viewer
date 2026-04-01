@@ -1324,12 +1324,10 @@ function getDateRange() {
         }
         container.appendChild(summaryDiv);
 
-        // Toolbar: view mode selector + action buttons
+        // Toolbar: view mode selector + action buttons in one row
         const toolbar = document.createElement('div');
-        toolbar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px';
+        toolbar.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap';
 
-        const viewSelector = document.createElement('div');
-        viewSelector.style.cssText = 'display:flex;gap:6px;align-items:center';
         const modes = [
             { key: 'any', label: 'Any Image' },
             { key: 'episode', label: 'Episode' },
@@ -1347,12 +1345,13 @@ function getDateRange() {
                 auditViewMode = m.key;
                 renderAuditResults();
             });
-            viewSelector.appendChild(btn);
+            toolbar.appendChild(btn);
         });
-        toolbar.appendChild(viewSelector);
 
-        const btnGroup = document.createElement('div');
-        btnGroup.style.cssText = 'display:flex;gap:8px';
+        // Separator before action buttons
+        const sep = document.createElement('div');
+        sep.style.cssText = 'width:1px;height:24px;background:var(--color-border);margin:0 6px';
+        toolbar.appendChild(sep);
 
         if (!isExcluded && totals.without > 0) {
             const viewAllBtn = document.createElement('button');
@@ -1364,15 +1363,14 @@ function getDateRange() {
                 viewAllBtn.textContent = 'Hide All Missing';
                 renderAllMissing(container);
             });
-            btnGroup.appendChild(viewAllBtn);
+            toolbar.appendChild(viewAllBtn);
         }
 
         const exportBtn = document.createElement('button');
         exportBtn.className = 'btn btn-sm btn-secondary';
         exportBtn.textContent = 'Export to Excel';
         exportBtn.addEventListener('click', exportAuditExcel);
-        btnGroup.appendChild(exportBtn);
-        toolbar.appendChild(btnGroup);
+        toolbar.appendChild(exportBtn);
         container.appendChild(toolbar);
 
         // Results table
