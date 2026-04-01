@@ -9,7 +9,8 @@ const ImagesView = (() => {
     let auditSelectedChannels = [];
     let auditResults = [];
     let auditInProgress = false;
-    let auditViewMode = 'any'; // 'any', 'episode', 'series', 'season'
+    let auditViewMode = 'any'; // 'any', 'episode', 'series', 'season', 'excluded'
+    let showAllMissing = false;
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
@@ -1343,6 +1344,7 @@ function getDateRange() {
             btn.textContent = m.label;
             btn.addEventListener('click', () => {
                 auditViewMode = m.key;
+                showAllMissing = false;
                 renderAuditResults();
             });
             toolbar.appendChild(btn);
@@ -1356,12 +1358,10 @@ function getDateRange() {
         if (!isExcluded && totals.without > 0) {
             const viewAllBtn = document.createElement('button');
             viewAllBtn.className = 'btn btn-sm btn-secondary';
-            viewAllBtn.textContent = `View All Missing (${totals.without})`;
+            viewAllBtn.textContent = showAllMissing ? 'Hide All Missing' : `View All Missing (${totals.without})`;
             viewAllBtn.addEventListener('click', () => {
-                const panel = document.getElementById('audit-all-missing');
-                if (panel) { panel.remove(); viewAllBtn.textContent = `View All Missing (${totals.without})`; return; }
-                viewAllBtn.textContent = 'Hide All Missing';
-                renderAllMissing(container);
+                showAllMissing = !showAllMissing;
+                renderAuditResults();
             });
             toolbar.appendChild(viewAllBtn);
         }
@@ -1377,7 +1377,39 @@ function getDateRange() {
         const table = document.createElement('table');
         table.className = 'data-table';
 
-        if (isExcluded) {
+        if (!isExcluded && showAllMissing) {
+            // All missing programmes view (replaces summary table)
+            const allMissing = [];
+            auditResults.forEach(r => {
+                getAuditCounts(r, mode).missingProgrammes.forEach(prog => {
+                    allMissing.push({ channel: r.channelTitle, ...prog });
+                });
+            });
+
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Channel</th>
+                        <th>Programme</th>
+                        <th>Date/Time</th>
+                        <th>Asset ID</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+            const tbody = table.querySelector('tbody');
+
+            allMissing.forEach(prog => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${API.escapeHtml(prog.channel)}</strong></td>
+                    <td>${API.escapeHtml(prog.title)}</td>
+                    <td>${API.escapeHtml(prog.dateTime)}</td>
+                    <td><code style="font-size:11px;user-select:all">${API.escapeHtml(prog.assetId)}</code></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else if (isExcluded) {
             // Excluded view: simple channel + count table with expandable list
             table.innerHTML = `
                 <thead>
@@ -1543,47 +1575,6 @@ function getDateRange() {
 
         wrapper.appendChild(miniTable);
         cell.appendChild(wrapper);
-    }
-
-    function renderAllMissing(container) {
-        const mode = auditViewMode;
-        const modeLabel = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[mode];
-
-        const panel = document.createElement('div');
-        panel.id = 'audit-all-missing';
-        panel.style.cssText = 'margin-top:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);max-height:500px;overflow-y:auto;padding:12px 16px';
-
-        const allMissing = [];
-        auditResults.forEach(r => {
-            getAuditCounts(r, mode).missingProgrammes.forEach(prog => {
-                allMissing.push({ channel: r.channelTitle, ...prog });
-            });
-        });
-
-        const heading = document.createElement('div');
-        heading.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px';
-        heading.textContent = `All Programmes Missing ${modeLabel} Images (${allMissing.length})`;
-        panel.appendChild(heading);
-
-        const table = document.createElement('table');
-        table.className = 'data-table';
-        table.style.fontSize = '13px';
-        table.innerHTML = `<thead><tr><th>Channel</th><th>Programme</th><th>Date/Time</th><th>Asset ID</th></tr></thead><tbody></tbody>`;
-        const tbody = table.querySelector('tbody');
-
-        allMissing.forEach(prog => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${API.escapeHtml(prog.channel)}</strong></td>
-                <td>${API.escapeHtml(prog.title)}</td>
-                <td>${API.escapeHtml(prog.dateTime)}</td>
-                <td><code style="font-size:11px;user-select:all">${API.escapeHtml(prog.assetId)}</code></td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        panel.appendChild(table);
-        container.appendChild(panel);
     }
 
     // --- Excel export ---
