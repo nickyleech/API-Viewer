@@ -1238,11 +1238,13 @@ function getDateRange() {
                         const related = asset.related || [];
                         const seasonNumbers = related.filter(r => r.type === 'season').map(r => r.number).filter(Boolean);
                         const seriesId = (related.find(r => r.type === 'series') || {}).id || null;
+                        const assetType = (asset.type || '').toLowerCase();
                         result.programmes.push({
                             title: item.title || 'Untitled',
                             dateTime: dt ? dt.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
                             assetId: asset.id || '-',
                             date,
+                            assetType,
                             hasAnyImage: images.length > 0,
                             hasEpisodeImage: sources.has('episode'),
                             hasSeriesImage: sources.has('series'),
@@ -1278,12 +1280,18 @@ function getDateRange() {
         return prog.hasAnyImage;
     }
 
+    const STANDALONE_TYPES = new Set(['movie', 'one-off']);
+
     function getAuditCounts(result, mode) {
         if (mode === 'excluded') {
             const excluded = result.programmes.filter(p => p.isOffAir);
             return { total: excluded.length, withImages: 0, withoutImages: 0, missingProgrammes: excluded };
         }
-        const progs = result.programmes.filter(p => !p.isOffAir);
+        let progs = result.programmes.filter(p => !p.isOffAir);
+        // Movies and one-offs don't have series/season images — exclude them from those counts
+        if (mode === 'series' || mode === 'season') {
+            progs = progs.filter(p => !STANDALONE_TYPES.has(p.assetType));
+        }
         const withImages = progs.filter(p => getImageFlag(p, mode)).length;
         return {
             total: progs.length,
