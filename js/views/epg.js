@@ -1265,112 +1265,171 @@ const EpgView = (() => {
         info.textContent = `Found on ${platformEpgData.length} platform(s)`;
         container.appendChild(info);
 
-        platformEpgData.forEach(({ platform, regionEpgs }) => {
-            const card = document.createElement('div');
-            card.style.cssText = 'border:1px solid var(--color-border);border-radius:8px;margin-bottom:12px;overflow:hidden';
+        // Build a cross-reference: rows = regions/countries, columns = platforms
+        const platformNames = platformEpgData.map(d => d.platform.title);
+        const countryOrder = ['England', 'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'];
 
-            // Check if all regions share the same EPG
-            const uniqueEpgs = [...new Set(regionEpgs.map(r => r.epg))];
-            const allSame = uniqueEpgs.length === 1;
-
-            // Platform header
-            const cardHeader = document.createElement('div');
-            cardHeader.style.cssText = 'padding:12px 16px;background:var(--color-surface);border-bottom:1px solid var(--color-border);display:flex;justify-content:space-between;align-items:center;cursor:pointer';
-            cardHeader.innerHTML = `
-                <div>
-                    <strong>${API.escapeHtml(platform.title)}</strong>
-                    <span style="color:var(--color-text-secondary);font-size:13px;margin-left:8px">${regionEpgs.length} region(s)</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px">
-                    ${allSame ? `<span class="badge badge-green">EPG ${API.escapeHtml(uniqueEpgs[0])}</span>` : `<span class="badge badge-orange">${uniqueEpgs.length} different EPG numbers</span>`}
-                    <span class="lookup-chevron" style="font-size:18px;transition:transform 0.2s">&#9660;</span>
-                </div>
-            `;
-            card.appendChild(cardHeader);
-
-            // Region table (collapsible body)
-            const cardBody = document.createElement('div');
-            cardBody.style.cssText = 'padding:0';
-
-            const table = document.createElement('table');
-            table.className = 'data-table';
-            table.style.cssText = 'margin:0;border:none;border-radius:0';
-
-            // Group regions by country if there are multiple
-            if (regionEpgs.length > 1 && regionEpgs[0].region !== '(No regions)') {
-                const mode = allSame ? uniqueEpgs[0] : getMode(
-                    regionEpgs.reduce((acc, r) => { acc[r.region] = r.epg; return acc; }, {})
-                );
-
-                // Group by country
-                const countryGroups = {};
-                regionEpgs.forEach(r => {
-                    const country = classifyRegion(r.region);
-                    if (!countryGroups[country]) countryGroups[country] = [];
-                    countryGroups[country].push(r);
-                });
-
-                const countryOrder = ['England', 'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'];
-
-                let thead = '<thead><tr><th>Region</th><th style="text-align:center;width:100px">EPG #</th></tr></thead>';
-                let tbody = '<tbody>';
-
-                countryOrder.forEach(country => {
-                    const group = countryGroups[country];
-                    if (!group || group.length === 0) return;
-
-                    const countryUniqueEpgs = [...new Set(group.map(r => r.epg))];
-                    const countryAllSame = countryUniqueEpgs.length === 1;
-
-                    if (countryAllSame) {
-                        // All regions in this country share the same EPG — show one row
-                        const epgMatch = String(countryUniqueEpgs[0]) === String(mode);
-                        const bgColor = allSame ? '' : (epgMatch ? 'background-color:rgba(76,175,80,0.1)' : 'background-color:rgba(255,152,0,0.1)');
-                        tbody += `<tr style="${bgColor}">
-                            <td><strong>${API.escapeHtml(country)}</strong></td>
-                            <td style="text-align:center"><strong>${API.escapeHtml(countryUniqueEpgs[0])}</strong></td>
-                        </tr>`;
-                    } else {
-                        // Different EPG numbers within this country — show country header + individual regions
-                        tbody += `<tr><td colspan="2" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
-
-                        group.forEach(r => {
-                            const epgMatch = String(r.epg) === String(mode);
-                            const bgColor = epgMatch ? 'background-color:rgba(76,175,80,0.1)' : 'background-color:rgba(255,152,0,0.1)';
-                            tbody += `<tr style="${bgColor}">
-                                <td style="padding-left:24px">${API.escapeHtml(r.region)}</td>
-                                <td style="text-align:center"><strong>${API.escapeHtml(r.epg)}</strong></td>
-                            </tr>`;
-                        });
-                    }
-                });
-
-                tbody += '</tbody>';
-                table.innerHTML = thead + tbody;
-            } else {
-                table.innerHTML = `
-                    <thead><tr><th>Region</th><th style="text-align:center;width:100px">EPG #</th></tr></thead>
-                    <tbody>${regionEpgs.map(r => `
-                        <tr>
-                            <td>${API.escapeHtml(r.region)}</td>
-                            <td style="text-align:center"><strong>${API.escapeHtml(r.epg)}</strong></td>
-                        </tr>
-                    `).join('')}</tbody>
-                `;
+        // For each platform, group its regions by country and consolidate where EPGs match
+        // Result: per platform, an array of { label, epg, isCountry } display rows
+        const platformCountryEpgs = platformEpgData.map(({ regionEpgs }) => {
+            // Check for no-region platforms
+            if (regionEpgs.length === 1 && regionEpgs[0].region === '(No regions)') {
+                return { rows: [{ label: 'All regions', epg: regionEpgs[0].epg }], noRegions: true };
             }
 
-            cardBody.appendChild(table);
-            card.appendChild(cardBody);
-
-            // Collapse/expand toggle
-            cardHeader.addEventListener('click', () => {
-                const isHidden = cardBody.style.display === 'none';
-                cardBody.style.display = isHidden ? '' : 'none';
-                cardHeader.querySelector('.lookup-chevron').style.transform = isHidden ? '' : 'rotate(-90deg)';
+            const countryGroups = {};
+            regionEpgs.forEach(r => {
+                const country = classifyRegion(r.region);
+                if (!countryGroups[country]) countryGroups[country] = [];
+                countryGroups[country].push(r);
             });
 
-            container.appendChild(card);
+            const rows = [];
+            countryOrder.forEach(country => {
+                const group = countryGroups[country];
+                if (!group || group.length === 0) return;
+                const uniqueEpgs = [...new Set(group.map(r => r.epg))];
+                if (uniqueEpgs.length === 1) {
+                    rows.push({ label: country, epg: uniqueEpgs[0], isCountry: true });
+                } else {
+                    group.forEach(r => {
+                        rows.push({ label: r.region, epg: r.epg, isCountry: false, country });
+                    });
+                }
+            });
+            return { rows, noRegions: false };
         });
+
+        // Collect all unique row labels across all platforms, in country order
+        const allRowLabels = [];
+        const rowCountryMap = {};
+        countryOrder.forEach(country => {
+            // Check if any platform uses this country as a consolidated row
+            const asCountry = platformCountryEpgs.some(p => !p.noRegions && p.rows.some(r => r.label === country && r.isCountry));
+            // Check if any platform expands this country into individual regions
+            const expandedRegions = [];
+            platformCountryEpgs.forEach(p => {
+                if (p.noRegions) return;
+                p.rows.filter(r => !r.isCountry && r.country === country).forEach(r => {
+                    if (!expandedRegions.includes(r.label)) expandedRegions.push(r.label);
+                });
+            });
+
+            if (asCountry && expandedRegions.length === 0) {
+                // All platforms that have this country use it consolidated
+                allRowLabels.push(country);
+                rowCountryMap[country] = country;
+            } else if (expandedRegions.length > 0) {
+                // At least one platform expands — list all individual regions
+                // Also include regions from platforms that consolidated (they'll show the country EPG for each)
+                const allRegionsForCountry = new Set(expandedRegions);
+                platformCountryEpgs.forEach(p => {
+                    if (p.noRegions) return;
+                    p.rows.filter(r => r.isCountry && r.label === country).forEach(() => {
+                        // This platform consolidated — we need to know which regions it covers
+                        // Use the raw regionEpgs to find them
+                    });
+                });
+                // Get all regions for this country across all platforms
+                platformEpgData.forEach(({ regionEpgs }) => {
+                    regionEpgs.forEach(r => {
+                        if (classifyRegion(r.region) === country) allRegionsForCountry.add(r.region);
+                    });
+                });
+                const sortedRegions = [...allRegionsForCountry].sort((a, b) => a.localeCompare(b));
+                sortedRegions.forEach(r => {
+                    allRowLabels.push(r);
+                    rowCountryMap[r] = country;
+                });
+            } else if (!asCountry) {
+                // No platform has this country at all — skip
+            }
+        });
+
+        // Handle no-region platforms: add a single "All regions" row if needed
+        const hasNoRegionPlatform = platformCountryEpgs.some(p => p.noRegions);
+        if (hasNoRegionPlatform && allRowLabels.length === 0) {
+            allRowLabels.push('All regions');
+        }
+
+        // Build lookup: for each platform index, map rowLabel → EPG
+        const platformEpgByRow = platformEpgData.map(({ regionEpgs }, idx) => {
+            const pData = platformCountryEpgs[idx];
+            const map = {};
+            if (pData.noRegions) {
+                // No-region platform: show its EPG for every row
+                allRowLabels.forEach(label => {
+                    map[label] = regionEpgs[0].epg;
+                });
+            } else {
+                allRowLabels.forEach(label => {
+                    // Check if this platform has a consolidated country row matching this label
+                    const countryRow = pData.rows.find(r => r.isCountry && r.label === label);
+                    if (countryRow) {
+                        map[label] = countryRow.epg;
+                        return;
+                    }
+                    // Check if this platform has this exact region
+                    const regionRow = pData.rows.find(r => !r.isCountry && r.label === label);
+                    if (regionRow) {
+                        map[label] = regionRow.epg;
+                        return;
+                    }
+                    // Check if this platform consolidated the country that this region belongs to
+                    const country = rowCountryMap[label];
+                    if (country) {
+                        const consolidated = pData.rows.find(r => r.isCountry && r.label === country);
+                        if (consolidated) {
+                            map[label] = consolidated.epg;
+                            return;
+                        }
+                    }
+                    map[label] = null;
+                });
+            }
+            return map;
+        });
+
+        // Render table
+        const table = document.createElement('table');
+        table.className = 'data-table';
+
+        // Header row
+        let thead = '<thead><tr><th style="min-width:180px">Region</th>';
+        platformNames.forEach(name => {
+            thead += `<th style="text-align:center;min-width:80px">${API.escapeHtml(name)}</th>`;
+        });
+        thead += '</tr></thead>';
+
+        // Body rows, grouped by country
+        let tbody = '<tbody>';
+        let lastCountry = null;
+        allRowLabels.forEach(label => {
+            const country = rowCountryMap[label];
+            // Insert country separator if this is an individual region and country changed
+            if (country && country !== label && country !== lastCountry) {
+                tbody += `<tr><td colspan="${platformNames.length + 1}" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
+                lastCountry = country;
+            }
+            if (country === label) lastCountry = country;
+
+            const isIndented = country && country !== label;
+            tbody += '<tr>';
+            tbody += `<td style="${isIndented ? 'padding-left:24px' : ''}"><strong>${API.escapeHtml(label)}</strong></td>`;
+            platformEpgByRow.forEach(map => {
+                const epg = map[label];
+                if (epg) {
+                    tbody += `<td style="text-align:center"><strong>${API.escapeHtml(epg)}</strong></td>`;
+                } else {
+                    tbody += `<td style="text-align:center;color:var(--color-text-secondary)">-</td>`;
+                }
+            });
+            tbody += '</tr>';
+        });
+        tbody += '</tbody>';
+
+        table.innerHTML = thead + tbody;
+        container.appendChild(table);
     }
 
     return { render };
