@@ -89,6 +89,10 @@ const EpgView = (() => {
                         <label>&nbsp;</label>
                         <button id="lookup-btn" class="btn btn-primary">Look Up</button>
                     </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="lookup-download-all" class="btn btn-secondary">Download All Channels (Excel)</button>
+                    </div>
                 </div>
                 <div id="lookup-channel-browser" style="display:none;margin-bottom:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)">
                     <div style="display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--color-border)">
@@ -133,6 +137,7 @@ const EpgView = (() => {
 
         // Channel Lookup tab
         document.getElementById('lookup-btn').addEventListener('click', lookupChannel);
+        document.getElementById('lookup-download-all').addEventListener('click', downloadAllChannelsExcel);
         document.getElementById('lookup-browse-all').addEventListener('click', toggleLookupBrowser);
         document.getElementById('lookup-browser-close').addEventListener('click', () => {
             document.getElementById('lookup-channel-browser').style.display = 'none';
@@ -1629,6 +1634,206 @@ const EpgView = (() => {
         table.innerHTML = thead + tbody;
         scrollWrap.appendChild(table);
         container.appendChild(scrollWrap);
+    }
+
+    async function downloadAllChannelsExcel() {
+        if (!confirm('This will fetch EPG data for all channels across every platform and region. This may take a while. Continue?')) return;
+
+        const results = document.getElementById('lookup-results');
+
+        if (platforms.length === 0) {
+            try {
+                const data = await API.fetch('/platform');
+                platforms = data.item || [];
+            } catch (err) {
+                API.toast('Failed to load platforms.', 'error');
+                return;
+            }
+        }
+
+        results.innerHTML = '';
+        const progress = document.createElement('div');
+        progress.style.cssText = 'margin:16px 0';
+        progress.innerHTML = `
+            <div style="font-size:13px;margin-bottom:6px;color:var(--color-text-secondary)">Fetching platform data... 0 / ${platforms.length}</div>
+            <div style="width:100%;height:8px;background:var(--color-border);border-radius:4px;overflow:hidden">
+                <div style="width:0%;height:100%;background:var(--color-accent);transition:width 0.3s"></div>
+            </div>
+        `;
+        results.appendChild(progress);
+        const progressText = progress.querySelector('div');
+        const progressBar = progress.querySelector('div > div > div');
+
+        // Fetch all platform data: regions + channel EPGs per region
+        const allPlatformData = [];
+        const batchSize = 5;
+
+        for (let i = 0; i < platforms.length; i++) {
+            const p = platforms[i];
+            progressText.textContent = `Fetching ${p.title}... ${i + 1} / ${platforms.length}`;
+            progressBar.style.width = `${((i + 1) / platforms.length) * 100}%`;
+
+            let pRegions = [];
+            try {
+                const data = await API.fetch(`/platform/${p.id}/region`);
+                pRegions = data.item || data || [];
+            } catch (err) { /* no regions */ }
+
+            const regionData = {};
+            let noRegions = false;
+
+            if (pRegions.length === 0) {
+                noRegions = true;
+                try {
+                    const data = await API.fetch('/channel', { platformId: p.id });
+                    regionData['(No regions)'] = (data.item || []).filter(ch => ch.epg);
+                } catch (err) { /* skip */ }
+            } else {
+                for (let j = 0; j < pRegions.length; j += batchSize) {
+                    const batch = pRegions.slice(j, j + batchSize);
+                    const promises = batch.map(async (r) => {
+                        const rName = r.title || r.name || 'Unnamed';
+                        try {
+                            const data = await API.fetch('/channel', { platformId: p.id, regionId: r.id });
+                            regionData[rName] = (data.item || []).filter(ch => ch.epg);
+                        } catch (err) {
+                            regionData[rName] = [];
+                        }
+                    });
+                    await Promise.all(promises);
+                }
+            }
+
+            allPlatformData.push({ platform: p, noRegions, regionData });
+        }
+
+        progressText.textContent = 'Generating Excel file...';
+
+        // Build channel lookup: channelTitle → { pIdx → { regionName → epgStr } }
+        const channelLookup = new Map();
+        allPlatformData.forEach(({ regionData }, pIdx) => {
+            Object.entries(regionData).forEach(([rName, channels]) => {
+                channels.forEach(ch => {
+                    const title = ch.title || ch.id;
+                    if (!channelLookup.has(title)) channelLookup.set(title, {});
+                    const entry = channelLookup.get(title);
+                    if (!entry[pIdx]) entry[pIdx] = {};
+                    entry[pIdx][rName] = String(ch.epg);
+                });
+            });
+        });
+
+        // Group regions by country
+        const allRegions = new Set();
+        allPlatformData.forEach(({ regionData }) => {
+            Object.keys(regionData).forEach(r => { if (r !== '(No regions)') allRegions.add(r); });
+        });
+
+        const cOrder = ['England', 'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'];
+        const regionsByC = {};
+        cOrder.forEach(c => { regionsByC[c] = []; });
+        allRegions.forEach(r => {
+            const c = classifyRegion(r);
+            if (!regionsByC[c]) regionsByC[c] = [];
+            regionsByC[c].push(r);
+        });
+        Object.values(regionsByC).forEach(arr => arr.sort());
+
+        const platformNames = allPlatformData.map(d => d.platform.title);
+        const wb = XLSX.utils.book_new();
+        const ABSENT = '__absent__';
+
+        function calcMode(chPlatRegions, countryRegions, pIdx) {
+            const rd = allPlatformData[pIdx].regionData;
+            const counts = {};
+            countryRegions.forEach(region => {
+                if (!rd[region]) return;
+                const key = (chPlatRegions && chPlatRegions[region]) || ABSENT;
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            let mode = null, maxCount = 0;
+            Object.entries(counts).forEach(([key, count]) => {
+                if (count > maxCount) { maxCount = count; mode = key === ABSENT ? null : key; }
+            });
+            return mode;
+        }
+
+        // Generate sheets per country
+        const allExcRows = [];
+
+        cOrder.forEach(country => {
+            const cRegions = regionsByC[country];
+            if (!cRegions || cRegions.length === 0) return;
+
+            const rows = [];
+            channelLookup.forEach((platData, chTitle) => {
+                const row = { 'Channel Name': chTitle };
+                let hasAny = false;
+                const variationParts = [];
+
+                allPlatformData.forEach(({ regionData, noRegions }, pIdx) => {
+                    const pName = platformNames[pIdx];
+
+                    if (noRegions) {
+                        const epg = platData[pIdx] && platData[pIdx]['(No regions)'];
+                        row[pName] = epg ? parseInt(epg) : '';
+                        if (epg) hasAny = true;
+                        return;
+                    }
+
+                    const mode = calcMode(platData[pIdx], cRegions, pIdx);
+                    row[pName] = mode ? parseInt(mode) : '';
+                    if (mode) hasAny = true;
+
+                    // Count regional exceptions for this platform
+                    let diffCount = 0;
+                    cRegions.forEach(region => {
+                        if (!regionData[region]) return;
+                        const epg = (platData[pIdx] && platData[pIdx][region]) || null;
+                        if (epg !== mode) {
+                            diffCount++;
+                            allExcRows.push({
+                                'Country': country, 'Region': region, 'Channel': chTitle,
+                                'Platform': pName,
+                                'Mode EPG': mode ? parseInt(mode) : '(absent)',
+                                'Actual EPG': epg ? parseInt(epg) : '(absent)'
+                            });
+                        }
+                    });
+                    if (diffCount > 0) variationParts.push(`${pName} (${diffCount})`);
+                });
+
+                row['Regional Variations'] = variationParts.join(', ');
+                if (hasAny) rows.push(row);
+            });
+
+            rows.sort((a, b) => {
+                const aMin = Math.min(...platformNames.map(p => typeof a[p] === 'number' ? epgSortKey(a[p]) : Infinity));
+                const bMin = Math.min(...platformNames.map(p => typeof b[p] === 'number' ? epgSortKey(b[p]) : Infinity));
+                return aMin - bMin;
+            });
+
+            if (rows.length > 0) {
+                const ws = XLSX.utils.json_to_sheet(rows);
+                XLSX.utils.book_append_sheet(wb, ws, country.slice(0, 31));
+            }
+        });
+
+        // Exceptions sheet
+        if (allExcRows.length > 0) {
+            allExcRows.sort((a, b) =>
+                (cOrder.indexOf(a.Country) - cOrder.indexOf(b.Country)) ||
+                a.Channel.localeCompare(b.Channel) ||
+                a.Platform.localeCompare(b.Platform) ||
+                a.Region.localeCompare(b.Region)
+            );
+            const ws = XLSX.utils.json_to_sheet(allExcRows);
+            XLSX.utils.book_append_sheet(wb, ws, 'Exceptions');
+        }
+
+        XLSX.writeFile(wb, 'Channel_Lookup_All.xlsx');
+        API.toast('Excel file downloaded.', 'success');
+        results.innerHTML = '';
     }
 
     return { render };
