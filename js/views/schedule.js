@@ -278,15 +278,16 @@ const ScheduleView = (() => {
             episodeNum ? `Episode ${episodeNum}${episodeTotal ? ` of ${episodeTotal}` : ''}` : ''
         ].filter(Boolean).join(', ');
 
+        const broadcastStr = [channelName, timeStr].filter(Boolean).join(', ');
+
         panel.innerHTML = `
-            ${channelName ? `<div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px">${API.escapeHtml(channelName)}</div>` : ''}
             <h3>${API.escapeHtml(item.title || 'Untitled')}</h3>
-            ${asset.title ? `<div style="font-size:15px;color:var(--color-text-secondary);margin:-8px 0 12px">${API.escapeHtml(asset.title)}</div>` : ''}
-            ${episodeInfo ? `<div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${API.escapeHtml(episodeInfo)}</div>` : ''}
 
             <div class="detail-row"><div class="detail-label">Schedule ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(item.id || '')}</code></div></div>
-            <div class="detail-row"><div class="detail-label">Broadcast</div><div class="detail-value">${API.escapeHtml(timeStr)}</div></div>
+            <div class="detail-row"><div class="detail-label">Broadcast</div><div class="detail-value">${API.escapeHtml(broadcastStr)}</div></div>
             ${item.duration ? `<div class="detail-row"><div class="detail-label">Duration</div><div class="detail-value">${item.duration} minutes</div></div>` : ''}
+            ${asset.title ? `<div class="detail-row"><div class="detail-label">Episode Title</div><div class="detail-value">${API.escapeHtml(asset.title)}</div></div>` : ''}
+            ${episodeInfo ? `<div class="detail-row"><div class="detail-label">Episode</div><div class="detail-value">${API.escapeHtml(episodeInfo)}</div></div>` : ''}
             ${asset.type ? `<div class="detail-row"><div class="detail-label">Type</div><div class="detail-value"><span class="badge badge-purple">${API.escapeHtml(asset.type)}</span></div></div>` : ''}
             ${asset.id ? `<div class="detail-row"><div class="detail-label">Asset ID</div><div class="detail-value"><code style="font-size:12px;user-select:all">${API.escapeHtml(asset.id)}</code></div></div>` : ''}
             ${cats ? `<div class="detail-row"><div class="detail-label">Categories</div><div class="detail-value">${cats}</div></div>` : ''}
@@ -379,6 +380,9 @@ const ScheduleView = (() => {
         // --- Contributors (hidden by default, toggled by checkbox) ---
         const contributors = asset.contributor || [];
         if (contributors.length > 0) {
+            const cast = contributors.filter(c => (c.role || []).includes('actor'));
+            const crew = contributors.filter(c => !(c.role || []).includes('actor'));
+
             const contSection = document.createElement('div');
             contSection.className = 'detail-row';
             contSection.style.cssText = 'flex-direction:column;gap:8px';
@@ -390,10 +394,29 @@ const ScheduleView = (() => {
 
             const contList = document.createElement('div');
             contList.style.display = 'none';
-            contList.innerHTML = contributors.map(c => {
-                const roles = (c.role || []).map(r => r.replace(/-/g, ' ')).join(', ');
-                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><strong style="min-width:160px">${API.escapeHtml(c.name)}</strong><span class="badge badge-purple" style="text-transform:capitalize">${API.escapeHtml(roles)}</span><code style="font-size:11px;color:var(--color-text-secondary);user-select:all">${API.escapeHtml(c.id || '')}</code></div>`;
-            }).join('');
+
+            function renderPerson(c, showRole) {
+                const chars = (c.character || []).map(ch => ch.name).filter(Boolean);
+                const roles = (c.role || []).map(r => r.replace(/-/g, ' '));
+                let detail = '';
+                if (chars.length > 0) {
+                    detail = `as <em>${API.escapeHtml(chars.join(', '))}</em>`;
+                } else if (showRole) {
+                    detail = `<span class="badge badge-purple" style="text-transform:capitalize">${API.escapeHtml(roles.join(', '))}</span>`;
+                }
+                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><strong style="min-width:180px">${API.escapeHtml(c.name)}</strong>${detail}<code style="font-size:11px;color:var(--color-text-secondary);user-select:all;margin-left:auto">${API.escapeHtml(c.id || '')}</code></div>`;
+            }
+
+            let html = '';
+            if (cast.length > 0) {
+                html += `<div style="font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.5px;padding:6px 0 2px">Cast</div>`;
+                html += cast.map(c => renderPerson(c, false)).join('');
+            }
+            if (crew.length > 0) {
+                html += `<div style="font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.5px;padding:${cast.length > 0 ? '12' : '6'}px 0 2px">Crew</div>`;
+                html += crew.map(c => renderPerson(c, true)).join('');
+            }
+            contList.innerHTML = html;
             contSection.appendChild(contList);
 
             contToggle.querySelector('input').addEventListener('change', (e) => {
