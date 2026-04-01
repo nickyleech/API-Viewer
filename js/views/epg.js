@@ -1445,7 +1445,7 @@ const EpgView = (() => {
             return map;
         });
 
-        // Collect all unique region names across all platforms (excluding no-region marker)
+        // Collect all unique region names
         const allRegions = new Set();
         platformEpgData.forEach(({ regionEpgs }) => {
             regionEpgs.forEach(r => {
@@ -1464,36 +1464,14 @@ const EpgView = (() => {
         });
         Object.values(regionsByCountry).forEach(arr => arr.sort((a, b) => a.localeCompare(b)));
 
-        // Build ordered rows: { region, channelId, channelTitle, country }
-        // Only include rows where the channel has an EPG on at least one platform
-        const rows = [];
-
-        function channelHasEpgInRegion(region, chId) {
-            return platformLookup.some(map =>
-                (map[region] && map[region][chId]) ||
-                (noRegionPlatforms.size > 0 && map['(No regions)'] && map['(No regions)'][chId])
-            );
-        }
-
-        if (allRegions.size === 0 && noRegionPlatforms.size > 0) {
-            // Only no-region platforms
-            channelIds.forEach(chId => {
-                if (channelHasEpgInRegion('(No regions)', chId)) {
-                    rows.push({ region: 'All regions', channelId: chId, channelTitle: channelInfos[chId]?.title || chId, country: null });
-                }
-            });
-        } else {
-            countryOrder.forEach(country => {
-                const regions = regionsByCountry[country];
-                if (!regions || regions.length === 0) return;
-                regions.forEach(region => {
-                    channelIds.forEach(chId => {
-                        if (channelHasEpgInRegion(region, chId)) {
-                            rows.push({ region, channelId: chId, channelTitle: channelInfos[chId]?.title || chId, country });
-                        }
-                    });
-                });
-            });
+        // Helper to get EPG for a specific (region, channelId, platformIndex)
+        function getEpg(region, chId, pIdx) {
+            const map = platformLookup[pIdx];
+            let epg = map[region] && map[region][chId];
+            if (!epg && noRegionPlatforms.has(pIdx) && map['(No regions)']) {
+                epg = map['(No regions)'][chId];
+            }
+            return epg || null;
         }
 
         const info = document.createElement('div');
@@ -1501,7 +1479,7 @@ const EpgView = (() => {
         info.textContent = `Found on ${platformEpgData.length} platform(s)`;
         container.appendChild(info);
 
-        // Render table in a scrollable wrapper with sticky header
+        // Render table
         const scrollWrap = document.createElement('div');
         scrollWrap.style.cssText = 'overflow:auto;max-height:70vh';
 
@@ -1519,45 +1497,129 @@ const EpgView = (() => {
         thead += '</tr></thead>';
 
         let tbody = '<tbody>';
-        let lastCountry = null;
-        let lastRegion = null;
 
-        rows.forEach(({ region, channelId, channelTitle, country }) => {
-            // Country separator
-            if (country && country !== lastCountry) {
-                tbody += `<tr><td colspan="${colSpan}" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
-                lastCountry = country;
-                lastRegion = null;
-            }
-
-            const showRegion = region !== lastRegion;
-            lastRegion = region;
-
-            tbody += '<tr>';
-            if (multiChannel && !showRegion) {
-                tbody += '<td></td>';
-            } else {
-                tbody += `<td style="${country ? 'padding-left:24px' : ''}"><strong>${API.escapeHtml(region)}</strong></td>`;
-            }
-            if (multiChannel) {
-                tbody += `<td>${API.escapeHtml(channelTitle)}</td>`;
-            }
-
-            platformLookup.forEach((map, pIdx) => {
-                let epg = map[region] && map[region][channelId];
-                if (!epg && noRegionPlatforms.has(pIdx) && map['(No regions)']) {
-                    epg = map['(No regions)'][channelId];
-                }
-                if (epg) {
-                    tbody += `<td style="text-align:center"><strong>${API.escapeHtml(epg)}</strong></td>`;
-                } else {
-                    tbody += `<td style="text-align:center;color:var(--color-text-secondary)">-</td>`;
-                }
+        // Handle no-region-only case
+        if (allRegions.size === 0 && noRegionPlatforms.size > 0) {
+            channelIds.forEach(chId => {
+                const title = channelInfos[chId]?.title || chId;
+                const hasAny = platformLookup.some((_, pIdx) => getEpg('(No regions)', chId, pIdx));
+                if (!hasAny) return;
+                tbody += '<tr>';
+                tbody += '<td><strong>All regions</strong></td>';
+                if (multiChannel) tbody += `<td>${API.escapeHtml(title)}</td>`;
+                platformLookup.forEach((_, pIdx) => {
+                    const epg = getEpg('(No regions)', chId, pIdx);
+                    tbody += epg
+                        ? `<td style="text-align:center"><strong>${API.escapeHtml(epg)}</strong></td>`
+                        : '<td style="text-align:center;color:var(--color-text-secondary)">-</td>';
+                });
+                tbody += '</tr>';
             });
-            tbody += '</tr>';
-        });
-        tbody += '</tbody>';
+        } else {
+            // Process each country with mode consolidation
+            const ABSENT = '__absent__';
 
+            countryOrder.forEach(country => {
+                const countryRegions = regionsByCountry[country];
+                if (!countryRegions || countryRegions.length === 0) return;
+
+                // Compute mode EPG for each (channelId, platformIndex) across this country's regions
+                const modeMap = {}; // chId → [modeEpg per platform]
+                channelIds.forEach(chId => {
+                    modeMap[chId] = platformLookup.map((_, pIdx) => {
+                        const counts = {};
+                        countryRegions.forEach(region => {
+                            const key = getEpg(region, chId, pIdx) || ABSENT;
+                            counts[key] = (counts[key] || 0) + 1;
+                        });
+                        let mode = null;
+                        let maxCount = 0;
+                        Object.entries(counts).forEach(([key, count]) => {
+                            if (count > maxCount) {
+                                maxCount = count;
+                                mode = key === ABSENT ? null : key;
+                            }
+                        });
+                        return mode;
+                    });
+                });
+
+                // Check if any channel has presence in this country
+                const hasPresence = channelIds.some(chId => modeMap[chId].some(m => m !== null));
+                if (!hasPresence) return;
+
+                // Country header
+                tbody += `<tr><td colspan="${colSpan}" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
+
+                // Summary rows: one per channel showing mode values
+                let summaryRegionShown = false;
+                channelIds.forEach(chId => {
+                    const title = channelInfos[chId]?.title || chId;
+                    const modes = modeMap[chId];
+                    if (modes.every(m => m === null)) return;
+
+                    tbody += '<tr>';
+                    if (!summaryRegionShown) {
+                        tbody += `<td style="padding-left:24px"><strong>${API.escapeHtml(country)}</strong></td>`;
+                        summaryRegionShown = true;
+                    } else {
+                        tbody += '<td></td>';
+                    }
+                    if (multiChannel) tbody += `<td>${API.escapeHtml(title)}</td>`;
+                    modes.forEach(mode => {
+                        tbody += mode
+                            ? `<td style="text-align:center"><strong>${API.escapeHtml(mode)}</strong></td>`
+                            : '<td style="text-align:center;color:var(--color-text-secondary)">-</td>';
+                    });
+                    tbody += '</tr>';
+                });
+
+                // Exception rows: regions where any (chId, pIdx) differs from mode
+                countryRegions.forEach(region => {
+                    const channelExceptions = [];
+                    channelIds.forEach(chId => {
+                        const modes = modeMap[chId];
+                        const hasDiff = platformLookup.some((_, pIdx) => {
+                            const actual = getEpg(region, chId, pIdx);
+                            return actual !== modes[pIdx];
+                        });
+                        if (hasDiff) channelExceptions.push(chId);
+                    });
+
+                    if (channelExceptions.length === 0) return;
+
+                    let regionShown = false;
+                    channelExceptions.forEach(chId => {
+                        const title = channelInfos[chId]?.title || chId;
+                        const modes = modeMap[chId];
+                        tbody += '<tr>';
+                        if (!regionShown) {
+                            tbody += `<td style="padding-left:36px;font-size:13px">${API.escapeHtml(region)}</td>`;
+                            regionShown = true;
+                        } else {
+                            tbody += '<td></td>';
+                        }
+                        if (multiChannel) tbody += `<td style="font-size:13px">${API.escapeHtml(title)}</td>`;
+                        platformLookup.forEach((_, pIdx) => {
+                            const actual = getEpg(region, chId, pIdx);
+                            const isDiff = actual !== modes[pIdx];
+                            if (actual) {
+                                tbody += isDiff
+                                    ? `<td style="text-align:center;background-color:#ff9800"><strong style="color:#fff">${API.escapeHtml(actual)}</strong></td>`
+                                    : `<td style="text-align:center"><strong>${API.escapeHtml(actual)}</strong></td>`;
+                            } else {
+                                tbody += isDiff
+                                    ? '<td style="text-align:center;background-color:#eeeeee"></td>'
+                                    : '<td style="text-align:center;color:var(--color-text-secondary)">-</td>';
+                            }
+                        });
+                        tbody += '</tr>';
+                    });
+                });
+            });
+        }
+
+        tbody += '</tbody>';
         table.innerHTML = thead + tbody;
         scrollWrap.appendChild(table);
         container.appendChild(scrollWrap);
