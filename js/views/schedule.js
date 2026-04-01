@@ -239,6 +239,7 @@ const ScheduleView = (() => {
 
     async function showProgrammeDetail(item) {
         const container = document.getElementById('content');
+        const channelName = (document.getElementById('sch-channel-search') || {}).value || '';
         savedScrollY = window.scrollY;
 
         savedListView = document.createDocumentFragment();
@@ -267,7 +268,6 @@ const ScheduleView = (() => {
         const certification = item.certification || asset.certification || {};
         const certEntries = Object.entries(certification).map(([k, v]) => `${k}: ${v}`).join(', ');
 
-        const channelName = (document.getElementById('sch-channel-search') || {}).value || '';
         const assetMeta = asset.meta || {};
         const seasonRelated = (asset.related || []).find(r => r.type === 'season');
         const seasonNum = seasonRelated ? seasonRelated.number : null;
@@ -404,7 +404,7 @@ const ScheduleView = (() => {
                 } else if (showRole) {
                     detail = `<span class="badge badge-purple" style="text-transform:capitalize">${API.escapeHtml(roles.join(', '))}</span>`;
                 }
-                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><strong style="min-width:180px">${API.escapeHtml(c.name)}</strong>${detail}<code style="font-size:11px;color:var(--color-text-secondary);user-select:all;margin-left:auto">${API.escapeHtml(c.id || '')}</code></div>`;
+                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><strong style="min-width:180px">${API.escapeHtml(c.name)}</strong>${detail}<code style="font-size:11px;color:var(--color-text-secondary);user-select:all">${API.escapeHtml(c.id || '')}</code></div>`;
             }
 
             let html = '';
