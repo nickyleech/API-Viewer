@@ -1233,6 +1233,7 @@ function getDateRange() {
                         const sources = new Set(images.map(img => img.source));
                         const asset = item.asset || {};
                         const dt = item.dateTime ? new Date(item.dateTime) : null;
+                        const categories = (asset.category || []).map(c => (c.name || '').toUpperCase());
                         result.programmes.push({
                             title: item.title || 'Untitled',
                             dateTime: dt ? dt.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
@@ -1241,7 +1242,8 @@ function getDateRange() {
                             hasAnyImage: images.length > 0,
                             hasEpisodeImage: sources.has('episode'),
                             hasSeriesImage: sources.has('series'),
-                            hasSeasonImage: sources.has('season')
+                            hasSeasonImage: sources.has('season'),
+                            isOffAir: categories.includes('OFF-AIR')
                         });
                     });
                     completedTasks++;
@@ -1271,7 +1273,11 @@ function getDateRange() {
     }
 
     function getAuditCounts(result, mode) {
-        const progs = result.programmes;
+        if (mode === 'excluded') {
+            const excluded = result.programmes.filter(p => p.isOffAir);
+            return { total: excluded.length, withImages: 0, withoutImages: 0, missingProgrammes: excluded };
+        }
+        const progs = result.programmes.filter(p => !p.isOffAir);
         const withImages = progs.filter(p => getImageFlag(p, mode)).length;
         return {
             total: progs.length,
@@ -1291,7 +1297,7 @@ function getDateRange() {
         }
 
         const mode = auditViewMode;
-        const modeLabel = { any: 'Any Image', episode: 'Episode', series: 'Series', season: 'Season' }[mode];
+        const modeLabel = { any: 'Any Image', episode: 'Episode', series: 'Series', season: 'Season', excluded: 'Excluded' }[mode];
 
         // Compute totals for current view mode
         const totals = auditResults.reduce((acc, r) => {
@@ -1301,11 +1307,21 @@ function getDateRange() {
 
         const totalPct = totals.total > 0 ? Math.round((totals.with / totals.total) * 100) : 0;
 
+        // Count excluded programmes across all channels
+        const totalExcluded = auditResults.reduce((sum, r) => sum + r.programmes.filter(p => p.isOffAir).length, 0);
+        const totalAll = auditResults.reduce((sum, r) => sum + r.programmes.length, 0);
+        const isExcluded = mode === 'excluded';
+
         // Summary info
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'results-info';
         summaryDiv.style.cssText = 'margin:0 0 12px 0';
-        summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, <strong style="color:var(--color-success)">${totals.with}</strong> with ${modeLabel.toLowerCase()} images (${totalPct}%), <strong style="color:${totals.without > 0 ? 'var(--color-error)' : 'var(--color-success)'}">${totals.without}</strong> missing`;
+        if (isExcluded) {
+            summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totalAll} programmes total, <strong style="color:var(--color-text-secondary)">${totalExcluded}</strong> excluded (off-air)`;
+        } else {
+            const excludedNote = totalExcluded > 0 ? ` <span style="color:var(--color-text-secondary);font-size:13px">(${totalExcluded} off-air excluded)</span>` : '';
+            summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, <strong style="color:var(--color-success)">${totals.with}</strong> with ${modeLabel.toLowerCase()} images (${totalPct}%), <strong style="color:${totals.without > 0 ? 'var(--color-error)' : 'var(--color-success)'}">${totals.without}</strong> missing${excludedNote}`;
+        }
         container.appendChild(summaryDiv);
 
         // Toolbar: view mode selector + action buttons
@@ -1320,6 +1336,9 @@ function getDateRange() {
             { key: 'series', label: 'Series' },
             { key: 'season', label: 'Season' }
         ];
+        if (totalExcluded > 0) {
+            modes.push({ key: 'excluded', label: `Excluded (${totalExcluded})` });
+        }
         modes.forEach(m => {
             const btn = document.createElement('button');
             btn.className = `filter-btn${m.key === mode ? ' active' : ''}`;
@@ -1335,7 +1354,7 @@ function getDateRange() {
         const btnGroup = document.createElement('div');
         btnGroup.style.cssText = 'display:flex;gap:8px';
 
-        if (totals.without > 0) {
+        if (!isExcluded && totals.without > 0) {
             const viewAllBtn = document.createElement('button');
             viewAllBtn.className = 'btn btn-sm btn-secondary';
             viewAllBtn.textContent = `View All Missing (${totals.without})`;
@@ -1359,85 +1378,142 @@ function getDateRange() {
         // Results table
         const table = document.createElement('table');
         table.className = 'data-table';
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Channel</th>
-                    <th style="text-align:right">Total</th>
-                    <th style="text-align:right">With Images</th>
-                    <th style="text-align:right">Missing</th>
-                    <th style="text-align:right">Coverage</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        `;
-        const tbody = table.querySelector('tbody');
 
-        auditResults.forEach(result => {
-            const counts = getAuditCounts(result, mode);
-            const pct = counts.total > 0 ? Math.round((counts.withImages / counts.total) * 100) : 0;
-            let pctColor, pctBg;
-            if (pct >= 90) { pctColor = '#1a7f37'; pctBg = '#e6f7ec'; }
-            else if (pct >= 70) { pctColor = '#c77c00'; pctBg = '#fff3e0'; }
-            else { pctColor = '#cf222e'; pctBg = '#ffeef0'; }
-
-            const row = document.createElement('tr');
-            row.className = 'clickable';
-            row.innerHTML = `
-                <td><strong>${API.escapeHtml(result.channelTitle)}</strong></td>
-                <td style="text-align:right">${counts.total}</td>
-                <td style="text-align:right"><span style="color:#1a7f37;font-weight:600">${counts.withImages}</span></td>
-                <td style="text-align:right">${counts.withoutImages > 0 ? `<span style="color:#cf222e;font-weight:600">${counts.withoutImages}</span>` : '<span style="color:#1a7f37">0</span>'}</td>
-                <td style="text-align:right"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:700;font-size:13px;background:${pctBg};color:${pctColor}">${pct}%</span></td>
+        if (isExcluded) {
+            // Excluded view: simple channel + count table with expandable list
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Channel</th>
+                        <th style="text-align:right">Excluded Programmes</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
             `;
+            const tbody = table.querySelector('tbody');
 
-            // Expandable drill-down row
-            const drillRow = document.createElement('tr');
-            drillRow.style.display = 'none';
-            const drillCell = document.createElement('td');
-            drillCell.colSpan = 5;
-            drillCell.style.cssText = 'padding:0;background:var(--color-bg)';
-            drillRow.appendChild(drillCell);
+            auditResults.forEach(result => {
+                const counts = getAuditCounts(result, mode);
+                if (counts.total === 0) return;
+                const row = document.createElement('tr');
+                row.className = 'clickable';
+                row.innerHTML = `
+                    <td><strong>${API.escapeHtml(result.channelTitle)}</strong></td>
+                    <td style="text-align:right"><span style="color:var(--color-text-secondary);font-weight:600">${counts.total}</span></td>
+                `;
 
-            row.addEventListener('click', () => {
-                const isOpen = drillRow.style.display !== 'none';
-                drillRow.style.display = isOpen ? 'none' : '';
-                if (!isOpen) {
-                    drillCell.innerHTML = '';
-                    renderAuditDrillDown(drillCell, result);
-                }
+                const drillRow = document.createElement('tr');
+                drillRow.style.display = 'none';
+                const drillCell = document.createElement('td');
+                drillCell.colSpan = 2;
+                drillCell.style.cssText = 'padding:0;background:var(--color-bg)';
+                drillRow.appendChild(drillCell);
+
+                row.addEventListener('click', () => {
+                    const isOpen = drillRow.style.display !== 'none';
+                    drillRow.style.display = isOpen ? 'none' : '';
+                    if (!isOpen) {
+                        drillCell.innerHTML = '';
+                        renderAuditDrillDown(drillCell, result);
+                    }
+                });
+
+                tbody.appendChild(row);
+                tbody.appendChild(drillRow);
             });
 
-            tbody.appendChild(row);
-            tbody.appendChild(drillRow);
-        });
+            const totalsRow = document.createElement('tr');
+            totalsRow.style.cssText = 'font-weight:700;border-top:2px solid var(--color-border)';
+            totalsRow.innerHTML = `
+                <td>TOTAL</td>
+                <td style="text-align:right">${totalExcluded}</td>
+            `;
+            tbody.appendChild(totalsRow);
+        } else {
+            // Normal coverage view
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Channel</th>
+                        <th style="text-align:right">Total</th>
+                        <th style="text-align:right">With Images</th>
+                        <th style="text-align:right">Missing</th>
+                        <th style="text-align:right">Coverage</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+            const tbody = table.querySelector('tbody');
 
-        // Totals row
-        const totalsRow = document.createElement('tr');
-        totalsRow.style.cssText = 'font-weight:700;border-top:2px solid var(--color-border)';
-        let tPctColor, tPctBg;
-        if (totalPct >= 90) { tPctColor = '#1a7f37'; tPctBg = '#e6f7ec'; }
-        else if (totalPct >= 70) { tPctColor = '#c77c00'; tPctBg = '#fff3e0'; }
-        else { tPctColor = '#cf222e'; tPctBg = '#ffeef0'; }
-        totalsRow.innerHTML = `
-            <td>TOTAL</td>
-            <td style="text-align:right">${totals.total}</td>
-            <td style="text-align:right"><span style="color:#1a7f37">${totals.with}</span></td>
-            <td style="text-align:right">${totals.without > 0 ? `<span style="color:#cf222e">${totals.without}</span>` : '<span style="color:#1a7f37">0</span>'}</td>
-            <td style="text-align:right"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:13px;background:${tPctBg};color:${tPctColor}">${totalPct}%</span></td>
-        `;
-        tbody.appendChild(totalsRow);
+            auditResults.forEach(result => {
+                const counts = getAuditCounts(result, mode);
+                const pct = counts.total > 0 ? Math.round((counts.withImages / counts.total) * 100) : 0;
+                let pctColor, pctBg;
+                if (pct >= 90) { pctColor = '#1a7f37'; pctBg = '#e6f7ec'; }
+                else if (pct >= 70) { pctColor = '#c77c00'; pctBg = '#fff3e0'; }
+                else { pctColor = '#cf222e'; pctBg = '#ffeef0'; }
+
+                const row = document.createElement('tr');
+                row.className = 'clickable';
+                row.innerHTML = `
+                    <td><strong>${API.escapeHtml(result.channelTitle)}</strong></td>
+                    <td style="text-align:right">${counts.total}</td>
+                    <td style="text-align:right"><span style="color:#1a7f37;font-weight:600">${counts.withImages}</span></td>
+                    <td style="text-align:right">${counts.withoutImages > 0 ? `<span style="color:#cf222e;font-weight:600">${counts.withoutImages}</span>` : '<span style="color:#1a7f37">0</span>'}</td>
+                    <td style="text-align:right"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:700;font-size:13px;background:${pctBg};color:${pctColor}">${pct}%</span></td>
+                `;
+
+                // Expandable drill-down row
+                const drillRow = document.createElement('tr');
+                drillRow.style.display = 'none';
+                const drillCell = document.createElement('td');
+                drillCell.colSpan = 5;
+                drillCell.style.cssText = 'padding:0;background:var(--color-bg)';
+                drillRow.appendChild(drillCell);
+
+                row.addEventListener('click', () => {
+                    const isOpen = drillRow.style.display !== 'none';
+                    drillRow.style.display = isOpen ? 'none' : '';
+                    if (!isOpen) {
+                        drillCell.innerHTML = '';
+                        renderAuditDrillDown(drillCell, result);
+                    }
+                });
+
+                tbody.appendChild(row);
+                tbody.appendChild(drillRow);
+            });
+
+            // Totals row
+            const totalsRow = document.createElement('tr');
+            totalsRow.style.cssText = 'font-weight:700;border-top:2px solid var(--color-border)';
+            let tPctColor, tPctBg;
+            if (totalPct >= 90) { tPctColor = '#1a7f37'; tPctBg = '#e6f7ec'; }
+            else if (totalPct >= 70) { tPctColor = '#c77c00'; tPctBg = '#fff3e0'; }
+            else { tPctColor = '#cf222e'; tPctBg = '#ffeef0'; }
+            totalsRow.innerHTML = `
+                <td>TOTAL</td>
+                <td style="text-align:right">${totals.total}</td>
+                <td style="text-align:right"><span style="color:#1a7f37">${totals.with}</span></td>
+                <td style="text-align:right">${totals.without > 0 ? `<span style="color:#cf222e">${totals.without}</span>` : '<span style="color:#1a7f37">0</span>'}</td>
+                <td style="text-align:right"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:13px;background:${tPctBg};color:${tPctColor}">${totalPct}%</span></td>
+            `;
+            tbody.appendChild(totalsRow);
+        }
 
         container.appendChild(table);
     }
 
     function renderAuditDrillDown(cell, result) {
         const mode = auditViewMode;
-        const modeLabel = { any: 'any', episode: 'episode', series: 'series', season: 'season' }[mode];
-        const missing = getAuditCounts(result, mode).missingProgrammes;
+        const isExcluded = mode === 'excluded';
+        const modeLabel = { any: 'any', episode: 'episode', series: 'series', season: 'season', excluded: 'excluded' }[mode];
+        const progs = getAuditCounts(result, mode).missingProgrammes;
 
-        if (missing.length === 0) {
-            cell.innerHTML = `<div style="padding:16px;color:var(--color-success);font-weight:600">All programmes have ${modeLabel} images!</div>`;
+        if (progs.length === 0) {
+            cell.innerHTML = isExcluded
+                ? '<div style="padding:16px;color:var(--color-text-secondary)">No excluded programmes.</div>'
+                : `<div style="padding:16px;color:var(--color-success);font-weight:600">All programmes have ${modeLabel} images!</div>`;
             return;
         }
 
@@ -1446,7 +1522,9 @@ function getDateRange() {
 
         const heading = document.createElement('div');
         heading.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px';
-        heading.textContent = `Programmes Missing ${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} Images (${missing.length})`;
+        heading.textContent = isExcluded
+            ? `Excluded Off-Air Programmes (${progs.length})`
+            : `Programmes Missing ${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} Images (${progs.length})`;
         wrapper.appendChild(heading);
 
         const miniTable = document.createElement('table');
@@ -1520,7 +1598,8 @@ function getDateRange() {
 
         // Summary sheet with all image type breakdowns
         const summaryRows = auditResults.map(r => {
-            const row = { 'Channel': r.channelTitle, 'Total Programmes': r.programmes.length };
+            const excluded = r.programmes.filter(p => p.isOffAir).length;
+            const row = { 'Channel': r.channelTitle, 'Total Programmes': r.programmes.length, 'Excluded (Off-Air)': excluded };
             modes.forEach(m => {
                 const label = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[m];
                 const c = getAuditCounts(r, m);
@@ -1532,14 +1611,15 @@ function getDateRange() {
         });
 
         // Totals row
-        const totalsRow = { 'Channel': 'TOTAL', 'Total Programmes': 0 };
+        const totalExcluded = auditResults.reduce((sum, r) => sum + r.programmes.filter(p => p.isOffAir).length, 0);
+        const totalAllProgs = auditResults.reduce((sum, r) => sum + r.programmes.length, 0);
+        const totalsRow = { 'Channel': 'TOTAL', 'Total Programmes': totalAllProgs, 'Excluded (Off-Air)': totalExcluded };
         modes.forEach(m => {
             const label = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[m];
             const t = auditResults.reduce((acc, r) => {
                 const c = getAuditCounts(r, m);
                 return { total: acc.total + c.total, with: acc.with + c.withImages };
             }, { total: 0, with: 0 });
-            totalsRow['Total Programmes'] = t.total;
             totalsRow[`${label} — With`] = t.with;
             totalsRow[`${label} — Missing`] = t.total - t.with;
             totalsRow[`${label} — Coverage %`] = t.total > 0 ? Math.round((t.with / t.total) * 100) : 0;
@@ -1566,6 +1646,22 @@ function getDateRange() {
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingRows), `Missing ${label}`);
             }
         });
+
+        // Excluded (off-air) sheet
+        const excludedRows = [];
+        auditResults.forEach(r => {
+            r.programmes.filter(p => p.isOffAir).forEach(p => {
+                excludedRows.push({
+                    'Channel': r.channelTitle,
+                    'Programme': p.title,
+                    'Date/Time': p.dateTime,
+                    'Asset ID': p.assetId
+                });
+            });
+        });
+        if (excludedRows.length > 0) {
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(excludedRows), 'Excluded Off-Air');
+        }
 
         const fileName = `Image_Audit_${new Date().toISOString().slice(0, 10)}.xlsx`;
         XLSX.writeFile(wb, fileName);
