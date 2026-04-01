@@ -1319,17 +1319,30 @@ const EpgView = (() => {
                     const group = countryGroups[country];
                     if (!group || group.length === 0) return;
 
-                    // Country separator row
-                    tbody += `<tr><td colspan="2" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
+                    const countryUniqueEpgs = [...new Set(group.map(r => r.epg))];
+                    const countryAllSame = countryUniqueEpgs.length === 1;
 
-                    group.forEach(r => {
-                        const epgMatch = String(r.epg) === String(mode);
+                    if (countryAllSame) {
+                        // All regions in this country share the same EPG — show one row
+                        const epgMatch = String(countryUniqueEpgs[0]) === String(mode);
                         const bgColor = allSame ? '' : (epgMatch ? 'background-color:rgba(76,175,80,0.1)' : 'background-color:rgba(255,152,0,0.1)');
                         tbody += `<tr style="${bgColor}">
-                            <td style="padding-left:24px">${API.escapeHtml(r.region)}</td>
-                            <td style="text-align:center"><strong>${API.escapeHtml(r.epg)}</strong></td>
+                            <td><strong>${API.escapeHtml(country)}</strong></td>
+                            <td style="text-align:center"><strong>${API.escapeHtml(countryUniqueEpgs[0])}</strong></td>
                         </tr>`;
-                    });
+                    } else {
+                        // Different EPG numbers within this country — show country header + individual regions
+                        tbody += `<tr><td colspan="2" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
+
+                        group.forEach(r => {
+                            const epgMatch = String(r.epg) === String(mode);
+                            const bgColor = epgMatch ? 'background-color:rgba(76,175,80,0.1)' : 'background-color:rgba(255,152,0,0.1)';
+                            tbody += `<tr style="${bgColor}">
+                                <td style="padding-left:24px">${API.escapeHtml(r.region)}</td>
+                                <td style="text-align:center"><strong>${API.escapeHtml(r.epg)}</strong></td>
+                            </tr>`;
+                        });
+                    }
                 });
 
                 tbody += '</tbody>';
