@@ -9,6 +9,7 @@ const ImagesView = (() => {
     let auditSelectedChannels = [];
     let auditResults = [];
     let auditInProgress = false;
+    let auditViewMode = 'any'; // 'any', 'episode', 'series', 'season'
 
     async function render(container) {
         const today = new Date().toISOString().slice(0, 10);
@@ -1208,10 +1209,7 @@ function getDateRange() {
             const result = {
                 channelTitle: channel.title,
                 channelId: channel.id,
-                totalProgrammes: 0,
-                withImages: 0,
-                withoutImages: 0,
-                missingProgrammes: []
+                programmes: []
             };
 
             // Batch dates 5 at a time
@@ -1231,20 +1229,20 @@ function getDateRange() {
                 const batchResults = await Promise.all(promises);
                 batchResults.forEach(({ date, items }) => {
                     items.forEach(item => {
-                        result.totalProgrammes++;
-                        if (getImages(item).length > 0) {
-                            result.withImages++;
-                        } else {
-                            result.withoutImages++;
-                            const asset = item.asset || {};
-                            const dt = item.dateTime ? new Date(item.dateTime) : null;
-                            result.missingProgrammes.push({
-                                title: item.title || 'Untitled',
-                                dateTime: dt ? dt.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
-                                assetId: asset.id || '-',
-                                date
-                            });
-                        }
+                        const images = getImages(item);
+                        const sources = new Set(images.map(img => img.source));
+                        const asset = item.asset || {};
+                        const dt = item.dateTime ? new Date(item.dateTime) : null;
+                        result.programmes.push({
+                            title: item.title || 'Untitled',
+                            dateTime: dt ? dt.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
+                            assetId: asset.id || '-',
+                            date,
+                            hasAnyImage: images.length > 0,
+                            hasEpisodeImage: sources.has('episode'),
+                            hasSeriesImage: sources.has('series'),
+                            hasSeasonImage: sources.has('season')
+                        });
                     });
                     completedTasks++;
                     const pct = Math.round((completedTasks / totalTasks) * 100);
@@ -1265,6 +1263,24 @@ function getDateRange() {
 
     // --- Audit results rendering ---
 
+    function getImageFlag(prog, mode) {
+        if (mode === 'episode') return prog.hasEpisodeImage;
+        if (mode === 'series') return prog.hasSeriesImage;
+        if (mode === 'season') return prog.hasSeasonImage;
+        return prog.hasAnyImage;
+    }
+
+    function getAuditCounts(result, mode) {
+        const progs = result.programmes;
+        const withImages = progs.filter(p => getImageFlag(p, mode)).length;
+        return {
+            total: progs.length,
+            withImages,
+            withoutImages: progs.length - withImages,
+            missingProgrammes: progs.filter(p => !getImageFlag(p, mode))
+        };
+    }
+
     function renderAuditResults() {
         const container = document.getElementById('audit-results');
         container.innerHTML = '';
@@ -1274,11 +1290,14 @@ function getDateRange() {
             return;
         }
 
-        const totals = auditResults.reduce((acc, r) => ({
-            total: acc.total + r.totalProgrammes,
-            with: acc.with + r.withImages,
-            without: acc.without + r.withoutImages
-        }), { total: 0, with: 0, without: 0 });
+        const mode = auditViewMode;
+        const modeLabel = { any: 'Any Image', episode: 'Episode', series: 'Series', season: 'Season' }[mode];
+
+        // Compute totals for current view mode
+        const totals = auditResults.reduce((acc, r) => {
+            const c = getAuditCounts(r, mode);
+            return { total: acc.total + c.total, with: acc.with + c.withImages, without: acc.without + c.withoutImages };
+        }, { total: 0, with: 0, without: 0 });
 
         const totalPct = totals.total > 0 ? Math.round((totals.with / totals.total) * 100) : 0;
 
@@ -1286,7 +1305,7 @@ function getDateRange() {
         const header = document.createElement('div');
         header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px';
         header.innerHTML = `<div class="results-info" style="margin:0">
-            ${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, ${totals.with} with images (${totalPct}%), ${totals.without} missing
+            ${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, ${totals.with} with ${modeLabel.toLowerCase()} images (${totalPct}%), ${totals.without} missing
         </div>`;
 
         const btnGroup = document.createElement('div');
@@ -1313,6 +1332,28 @@ function getDateRange() {
         header.appendChild(btnGroup);
         container.appendChild(header);
 
+        // View mode selector
+        const viewSelector = document.createElement('div');
+        viewSelector.className = 'filter-bar';
+        viewSelector.style.cssText = 'margin-bottom:12px';
+        const modes = [
+            { key: 'any', label: 'Any Image' },
+            { key: 'episode', label: 'Episode' },
+            { key: 'series', label: 'Series' },
+            { key: 'season', label: 'Season' }
+        ];
+        modes.forEach(m => {
+            const btn = document.createElement('button');
+            btn.className = `filter-btn${m.key === mode ? ' active' : ''}`;
+            btn.textContent = m.label;
+            btn.addEventListener('click', () => {
+                auditViewMode = m.key;
+                renderAuditResults();
+            });
+            viewSelector.appendChild(btn);
+        });
+        container.appendChild(viewSelector);
+
         // Results table
         const table = document.createElement('table');
         table.className = 'data-table';
@@ -1331,7 +1372,8 @@ function getDateRange() {
         const tbody = table.querySelector('tbody');
 
         auditResults.forEach(result => {
-            const pct = result.totalProgrammes > 0 ? Math.round((result.withImages / result.totalProgrammes) * 100) : 0;
+            const counts = getAuditCounts(result, mode);
+            const pct = counts.total > 0 ? Math.round((counts.withImages / counts.total) * 100) : 0;
             let color = 'var(--color-error)';
             if (pct >= 90) color = 'var(--color-success)';
             else if (pct >= 70) color = '#e67e00';
@@ -1340,9 +1382,9 @@ function getDateRange() {
             row.className = 'clickable';
             row.innerHTML = `
                 <td><strong>${API.escapeHtml(result.channelTitle)}</strong></td>
-                <td style="text-align:right">${result.totalProgrammes}</td>
-                <td style="text-align:right">${result.withImages}</td>
-                <td style="text-align:right">${result.withoutImages}</td>
+                <td style="text-align:right">${counts.total}</td>
+                <td style="text-align:right">${counts.withImages}</td>
+                <td style="text-align:right">${counts.withoutImages}</td>
                 <td style="text-align:right;font-weight:700;color:${color}">${pct}%</td>
             `;
 
@@ -1357,7 +1399,8 @@ function getDateRange() {
             row.addEventListener('click', () => {
                 const isOpen = drillRow.style.display !== 'none';
                 drillRow.style.display = isOpen ? 'none' : '';
-                if (!isOpen && drillCell.children.length === 0) {
+                if (!isOpen) {
+                    drillCell.innerHTML = '';
                     renderAuditDrillDown(drillCell, result);
                 }
             });
@@ -1385,8 +1428,12 @@ function getDateRange() {
     }
 
     function renderAuditDrillDown(cell, result) {
-        if (result.missingProgrammes.length === 0) {
-            cell.innerHTML = '<div style="padding:16px;color:var(--color-success);font-weight:600">All programmes have images!</div>';
+        const mode = auditViewMode;
+        const modeLabel = { any: 'any', episode: 'episode', series: 'series', season: 'season' }[mode];
+        const missing = getAuditCounts(result, mode).missingProgrammes;
+
+        if (missing.length === 0) {
+            cell.innerHTML = `<div style="padding:16px;color:var(--color-success);font-weight:600">All programmes have ${modeLabel} images!</div>`;
             return;
         }
 
@@ -1395,7 +1442,7 @@ function getDateRange() {
 
         const heading = document.createElement('div');
         heading.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px';
-        heading.textContent = `Programmes Missing Images (${result.missingProgrammes.length})`;
+        heading.textContent = `Programmes Missing ${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} Images (${missing.length})`;
         wrapper.appendChild(heading);
 
         const miniTable = document.createElement('table');
@@ -1404,7 +1451,7 @@ function getDateRange() {
         miniTable.innerHTML = `<thead><tr><th>Programme</th><th>Date/Time</th><th>Asset ID</th></tr></thead><tbody></tbody>`;
         const miniBody = miniTable.querySelector('tbody');
 
-        result.missingProgrammes.forEach(prog => {
+        missing.forEach(prog => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${API.escapeHtml(prog.title)}</td>
@@ -1419,20 +1466,23 @@ function getDateRange() {
     }
 
     function renderAllMissing(container) {
+        const mode = auditViewMode;
+        const modeLabel = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[mode];
+
         const panel = document.createElement('div');
         panel.id = 'audit-all-missing';
         panel.style.cssText = 'margin-top:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);max-height:500px;overflow-y:auto;padding:12px 16px';
 
         const allMissing = [];
         auditResults.forEach(r => {
-            r.missingProgrammes.forEach(prog => {
+            getAuditCounts(r, mode).missingProgrammes.forEach(prog => {
                 allMissing.push({ channel: r.channelTitle, ...prog });
             });
         });
 
         const heading = document.createElement('div');
         heading.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px';
-        heading.textContent = `All Programmes Missing Images (${allMissing.length})`;
+        heading.textContent = `All Programmes Missing ${modeLabel} Images (${allMissing.length})`;
         panel.appendChild(heading);
 
         const table = document.createElement('table');
@@ -1462,50 +1512,56 @@ function getDateRange() {
         if (auditResults.length === 0) { API.toast('No results to export.', 'warning'); return; }
 
         const wb = XLSX.utils.book_new();
+        const modes = ['any', 'episode', 'series', 'season'];
 
-        // Summary sheet
+        // Summary sheet with all image type breakdowns
         const summaryRows = auditResults.map(r => {
-            const pct = r.totalProgrammes > 0 ? Math.round((r.withImages / r.totalProgrammes) * 100) : 0;
-            return {
-                'Channel': r.channelTitle,
-                'Total Programmes': r.totalProgrammes,
-                'With Images': r.withImages,
-                'Missing Images': r.withoutImages,
-                'Coverage %': pct
-            };
+            const row = { 'Channel': r.channelTitle, 'Total Programmes': r.programmes.length };
+            modes.forEach(m => {
+                const label = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[m];
+                const c = getAuditCounts(r, m);
+                row[`${label} — With`] = c.withImages;
+                row[`${label} — Missing`] = c.withoutImages;
+                row[`${label} — Coverage %`] = c.total > 0 ? Math.round((c.withImages / c.total) * 100) : 0;
+            });
+            return row;
         });
 
-        const totals = auditResults.reduce((a, r) => ({
-            total: a.total + r.totalProgrammes, with: a.with + r.withImages, without: a.without + r.withoutImages
-        }), { total: 0, with: 0, without: 0 });
-        const totalPct = totals.total > 0 ? Math.round((totals.with / totals.total) * 100) : 0;
-
-        summaryRows.push({
-            'Channel': 'TOTAL',
-            'Total Programmes': totals.total,
-            'With Images': totals.with,
-            'Missing Images': totals.without,
-            'Coverage %': totalPct
+        // Totals row
+        const totalsRow = { 'Channel': 'TOTAL', 'Total Programmes': 0 };
+        modes.forEach(m => {
+            const label = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[m];
+            const t = auditResults.reduce((acc, r) => {
+                const c = getAuditCounts(r, m);
+                return { total: acc.total + c.total, with: acc.with + c.withImages };
+            }, { total: 0, with: 0 });
+            totalsRow['Total Programmes'] = t.total;
+            totalsRow[`${label} — With`] = t.with;
+            totalsRow[`${label} — Missing`] = t.total - t.with;
+            totalsRow[`${label} — Coverage %`] = t.total > 0 ? Math.round((t.with / t.total) * 100) : 0;
         });
+        summaryRows.push(totalsRow);
 
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Summary');
 
-        // Missing images sheet
-        const missingRows = [];
-        auditResults.forEach(r => {
-            r.missingProgrammes.forEach(p => {
-                missingRows.push({
-                    'Channel': r.channelTitle,
-                    'Programme': p.title,
-                    'Date/Time': p.dateTime,
-                    'Asset ID': p.assetId
+        // Missing images sheets per type
+        modes.forEach(m => {
+            const label = { any: 'Any', episode: 'Episode', series: 'Series', season: 'Season' }[m];
+            const missingRows = [];
+            auditResults.forEach(r => {
+                getAuditCounts(r, m).missingProgrammes.forEach(p => {
+                    missingRows.push({
+                        'Channel': r.channelTitle,
+                        'Programme': p.title,
+                        'Date/Time': p.dateTime,
+                        'Asset ID': p.assetId
+                    });
                 });
             });
+            if (missingRows.length > 0) {
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingRows), `Missing ${label}`);
+            }
         });
-
-        if (missingRows.length > 0) {
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingRows), 'Missing Images');
-        }
 
         const fileName = `Image_Audit_${new Date().toISOString().slice(0, 10)}.xlsx`;
         XLSX.writeFile(wb, fileName);
