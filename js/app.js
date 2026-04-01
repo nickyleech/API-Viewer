@@ -5,7 +5,8 @@ const App = (() => {
         epg: EpgView,
         schedule: ScheduleView,
         images: ImagesView,
-        logos: LogosView
+        logos: LogosView,
+        review: ReviewView
     };
 
     let currentView = null;
@@ -20,6 +21,8 @@ const App = (() => {
         } else {
             updateKeyStatus();
         }
+
+        ReviewStore.updateBadge();
 
         // Navigate from hash or default to platforms
         const hash = window.location.hash.slice(1) || 'images';

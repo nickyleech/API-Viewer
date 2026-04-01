@@ -60,7 +60,7 @@ const API = (() => {
     }
 
     // Helper to render a JSON toggle
-    function jsonToggle(data) {
+    function jsonToggle(data, onMarkReview) {
         const wrapper = document.createElement('div');
         wrapper.className = 'json-toggle';
         const jsonStr = JSON.stringify(data, null, 2);
@@ -92,6 +92,18 @@ const API = (() => {
 
         btnGroup.appendChild(btn);
         btnGroup.appendChild(copyBtn);
+
+        if (typeof onMarkReview === 'function') {
+            const reviewBtn = document.createElement('button');
+            reviewBtn.className = 'btn btn-sm btn-review';
+            reviewBtn.textContent = 'Mark for Review';
+            reviewBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onMarkReview();
+            });
+            btnGroup.appendChild(reviewBtn);
+        }
+
         wrapper.appendChild(btnGroup);
         wrapper.appendChild(viewer);
         return wrapper;

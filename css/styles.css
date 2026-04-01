@@ -860,6 +860,120 @@ body {
     background: #eee;
 }
 
+/* ===== Review Button ===== */
+.btn-review {
+    background: #fff3e0;
+    color: #c77c00;
+    border: 1px solid #ffd699;
+}
+
+.btn-review:hover {
+    background: #ffe0b2;
+    border-color: #c77c00;
+}
+
+/* ===== Review Cards ===== */
+.review-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+}
+
+.review-card.checking {
+    border-left: 3px solid var(--color-success);
+}
+
+.review-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.review-card-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.review-card-meta {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+
+.review-card-note {
+    font-size: 14px;
+    color: var(--color-text);
+    background: var(--color-bg);
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    margin: 8px 0;
+    border-left: 3px solid var(--color-accent);
+}
+
+.review-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+.review-card-timestamp {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-left: auto;
+}
+
+/* ===== Review Toolbar ===== */
+.review-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+/* ===== Review Modal Textarea ===== */
+.review-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--color-text);
+    resize: vertical;
+}
+
+.review-textarea:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+}
+
+/* ===== Sidebar Review Badge ===== */
+.nav-link .badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    vertical-align: middle;
+}
+
+/* ===== Delete Button Variant ===== */
+.btn-delete {
+    color: var(--color-error);
+    border-color: #fecaca;
+}
+
+.btn-delete:hover {
+    background: #fef2f2;
+    border-color: var(--color-error);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .app-layout {

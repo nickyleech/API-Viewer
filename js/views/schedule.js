@@ -440,7 +440,9 @@ const ScheduleView = (() => {
             panel.appendChild(toggleRow);
         }
 
-        panel.firstElementChild.after(API.jsonToggle(item));
+        panel.firstElementChild.after(API.jsonToggle(item, () => {
+            ReviewStore.openReviewModal(item, channelName, 'schedule');
+        }));
     }
 
     return { render };

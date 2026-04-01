@@ -633,7 +633,9 @@ function getDateRange() {
 
         renderImageGallery(container, images, item.title);
 
-        panel.firstElementChild.after(API.jsonToggle(item));
+        panel.firstElementChild.after(API.jsonToggle(item, () => {
+            ReviewStore.openReviewModal(item, channelName, 'images');
+        }));
     }
 
     // ============================================================
