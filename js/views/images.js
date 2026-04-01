@@ -1301,12 +1301,36 @@ function getDateRange() {
 
         const totalPct = totals.total > 0 ? Math.round((totals.with / totals.total) * 100) : 0;
 
-        // Header row with info + export button
-        const header = document.createElement('div');
-        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px';
-        header.innerHTML = `<div class="results-info" style="margin:0">
-            ${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, ${totals.with} with ${modeLabel.toLowerCase()} images (${totalPct}%), ${totals.without} missing
-        </div>`;
+        // Summary info
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'results-info';
+        summaryDiv.style.cssText = 'margin:0 0 12px 0';
+        summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, <strong style="color:var(--color-success)">${totals.with}</strong> with ${modeLabel.toLowerCase()} images (${totalPct}%), <strong style="color:${totals.without > 0 ? 'var(--color-error)' : 'var(--color-success)'}">${totals.without}</strong> missing`;
+        container.appendChild(summaryDiv);
+
+        // Toolbar: view mode selector + action buttons
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px';
+
+        const viewSelector = document.createElement('div');
+        viewSelector.style.cssText = 'display:flex;gap:6px;align-items:center';
+        const modes = [
+            { key: 'any', label: 'Any Image' },
+            { key: 'episode', label: 'Episode' },
+            { key: 'series', label: 'Series' },
+            { key: 'season', label: 'Season' }
+        ];
+        modes.forEach(m => {
+            const btn = document.createElement('button');
+            btn.className = `filter-btn${m.key === mode ? ' active' : ''}`;
+            btn.textContent = m.label;
+            btn.addEventListener('click', () => {
+                auditViewMode = m.key;
+                renderAuditResults();
+            });
+            viewSelector.appendChild(btn);
+        });
+        toolbar.appendChild(viewSelector);
 
         const btnGroup = document.createElement('div');
         btnGroup.style.cssText = 'display:flex;gap:8px';
@@ -1329,30 +1353,8 @@ function getDateRange() {
         exportBtn.textContent = 'Export to Excel';
         exportBtn.addEventListener('click', exportAuditExcel);
         btnGroup.appendChild(exportBtn);
-        header.appendChild(btnGroup);
-        container.appendChild(header);
-
-        // View mode selector
-        const viewSelector = document.createElement('div');
-        viewSelector.className = 'filter-bar';
-        viewSelector.style.cssText = 'margin-bottom:12px';
-        const modes = [
-            { key: 'any', label: 'Any Image' },
-            { key: 'episode', label: 'Episode' },
-            { key: 'series', label: 'Series' },
-            { key: 'season', label: 'Season' }
-        ];
-        modes.forEach(m => {
-            const btn = document.createElement('button');
-            btn.className = `filter-btn${m.key === mode ? ' active' : ''}`;
-            btn.textContent = m.label;
-            btn.addEventListener('click', () => {
-                auditViewMode = m.key;
-                renderAuditResults();
-            });
-            viewSelector.appendChild(btn);
-        });
-        container.appendChild(viewSelector);
+        toolbar.appendChild(btnGroup);
+        container.appendChild(toolbar);
 
         // Results table
         const table = document.createElement('table');
@@ -1374,18 +1376,19 @@ function getDateRange() {
         auditResults.forEach(result => {
             const counts = getAuditCounts(result, mode);
             const pct = counts.total > 0 ? Math.round((counts.withImages / counts.total) * 100) : 0;
-            let color = 'var(--color-error)';
-            if (pct >= 90) color = 'var(--color-success)';
-            else if (pct >= 70) color = '#e67e00';
+            let pctColor, pctBg;
+            if (pct >= 90) { pctColor = '#1a7f37'; pctBg = '#e6f7ec'; }
+            else if (pct >= 70) { pctColor = '#c77c00'; pctBg = '#fff3e0'; }
+            else { pctColor = '#cf222e'; pctBg = '#ffeef0'; }
 
             const row = document.createElement('tr');
             row.className = 'clickable';
             row.innerHTML = `
                 <td><strong>${API.escapeHtml(result.channelTitle)}</strong></td>
                 <td style="text-align:right">${counts.total}</td>
-                <td style="text-align:right">${counts.withImages}</td>
-                <td style="text-align:right">${counts.withoutImages}</td>
-                <td style="text-align:right;font-weight:700;color:${color}">${pct}%</td>
+                <td style="text-align:right"><span style="color:#1a7f37;font-weight:600">${counts.withImages}</span></td>
+                <td style="text-align:right">${counts.withoutImages > 0 ? `<span style="color:#cf222e;font-weight:600">${counts.withoutImages}</span>` : '<span style="color:#1a7f37">0</span>'}</td>
+                <td style="text-align:right"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:700;font-size:13px;background:${pctBg};color:${pctColor}">${pct}%</span></td>
             `;
 
             // Expandable drill-down row
@@ -1412,15 +1415,16 @@ function getDateRange() {
         // Totals row
         const totalsRow = document.createElement('tr');
         totalsRow.style.cssText = 'font-weight:700;border-top:2px solid var(--color-border)';
-        let totalColor = 'var(--color-error)';
-        if (totalPct >= 90) totalColor = 'var(--color-success)';
-        else if (totalPct >= 70) totalColor = '#e67e00';
+        let tPctColor, tPctBg;
+        if (totalPct >= 90) { tPctColor = '#1a7f37'; tPctBg = '#e6f7ec'; }
+        else if (totalPct >= 70) { tPctColor = '#c77c00'; tPctBg = '#fff3e0'; }
+        else { tPctColor = '#cf222e'; tPctBg = '#ffeef0'; }
         totalsRow.innerHTML = `
             <td>TOTAL</td>
             <td style="text-align:right">${totals.total}</td>
-            <td style="text-align:right">${totals.with}</td>
-            <td style="text-align:right">${totals.without}</td>
-            <td style="text-align:right;color:${totalColor}">${totalPct}%</td>
+            <td style="text-align:right"><span style="color:#1a7f37">${totals.with}</span></td>
+            <td style="text-align:right">${totals.without > 0 ? `<span style="color:#cf222e">${totals.without}</span>` : '<span style="color:#1a7f37">0</span>'}</td>
+            <td style="text-align:right"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:13px;background:${tPctBg};color:${tPctColor}">${totalPct}%</span></td>
         `;
         tbody.appendChild(totalsRow);
 

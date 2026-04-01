@@ -216,6 +216,31 @@ body {
 .badge-purple { background: #f3e8ff; color: #7c3aed; }
 .badge-gray { background: #eef0f2; color: #5a6b7d; }
 
+/* ===== Filter Buttons ===== */
+.filter-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.filter-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.filter-btn.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+}
+
 /* ===== Forms ===== */
 .filter-bar {
     display: flex;
