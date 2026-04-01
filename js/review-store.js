@@ -102,7 +102,7 @@ const ReviewStore = (() => {
         badge.style.display = count > 0 ? 'inline-block' : 'none';
     }
 
-    function openReviewModal(item, channelName, source) {
+    function openReviewModal(item, channelName, source, channelId) {
         if (has(item.id)) {
             API.toast('This programme is already marked for review.', 'warning');
             return;
@@ -152,6 +152,7 @@ const ReviewStore = (() => {
                 title: title,
                 note: note,
                 channel: channelName || '',
+                channelId: channelId || '',
                 dateTime: item.dateTime || '',
                 assetId: asset.id || '',
                 source: source || '',

@@ -439,20 +439,29 @@ function getDateRange() {
         }
     }
 
-    function showProgrammeDetail(item) {
+    function showProgrammeDetail(item, externalOpts) {
         const container = document.getElementById('content');
-        const channelName = (document.getElementById('img-channel-search') || {}).value || '';
+        const channelName = (externalOpts && externalOpts.channelName) || (document.getElementById('img-channel-search') || {}).value || '';
         window.scrollTo(0, 0);
 
-        savedListView = document.createDocumentFragment();
-        while (container.firstChild) {
-            savedListView.appendChild(container.firstChild);
+        if (externalOpts && externalOpts.onBack) {
+            container.innerHTML = '';
+        } else {
+            savedListView = document.createDocumentFragment();
+            while (container.firstChild) {
+                savedListView.appendChild(container.firstChild);
+            }
         }
 
         const back = document.createElement('a');
         back.className = 'back-link';
-        back.innerHTML = '&larr; Back to Image Viewer';
-        back.addEventListener('click', () => restoreListView());
+        if (externalOpts && externalOpts.onBack) {
+            back.innerHTML = '&larr; Back to Review List';
+            back.addEventListener('click', externalOpts.onBack);
+        } else {
+            back.innerHTML = '&larr; Back to Image Viewer';
+            back.addEventListener('click', () => restoreListView());
+        }
         container.appendChild(back);
 
         const images = getImages(item);
@@ -634,7 +643,8 @@ function getDateRange() {
         renderImageGallery(container, images, item.title);
 
         panel.firstElementChild.after(API.jsonToggle(item, () => {
-            ReviewStore.openReviewModal(item, channelName, 'images');
+            const channelId = (document.getElementById('img-channel-id') || {}).value || '';
+            ReviewStore.openReviewModal(item, channelName, 'images', channelId);
         }));
     }
 
@@ -1685,6 +1695,6 @@ function getDateRange() {
         API.toast('Audit exported.', 'success');
     }
 
-    return { render };
+    return { render, showProgrammeDetail };
 })();
 

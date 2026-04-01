@@ -65,7 +65,9 @@ const ReviewView = (() => {
         });
         let items = allItems;
 
-        if (currentFilter === 'checking') {
+        if (currentFilter === 'all') {
+            items = allItems.filter(i => !i.checking);
+        } else if (currentFilter === 'checking') {
             items = allItems.filter(i => i.checking);
         }
 
@@ -107,11 +109,17 @@ const ReviewView = (() => {
                 </div>
                 ${item.note ? `<div class="review-card-note">${API.escapeHtml(item.note)}</div>` : ''}
                 <div class="review-card-actions">
+                    ${item.channelId && item.dateTime ? '<button class="btn btn-sm btn-primary review-view-btn">View</button>' : ''}
                     <button class="btn btn-sm btn-secondary review-toggle-btn">${item.checking ? 'Uncheck' : 'Mark Being Checked'}</button>
                     <button class="btn btn-sm btn-secondary btn-delete review-delete-btn">Delete</button>
                     <span class="review-card-timestamp">Added ${API.escapeHtml(addedAt)}</span>
                 </div>
             `;
+
+            const viewBtn = card.querySelector('.review-view-btn');
+            if (viewBtn) {
+                viewBtn.addEventListener('click', () => viewProgramme(item));
+            }
 
             card.querySelector('.review-toggle-btn').addEventListener('click', () => {
                 ReviewStore.toggleChecking(item.id);
@@ -126,6 +134,59 @@ const ReviewView = (() => {
 
             container.appendChild(card);
         });
+    }
+
+    async function viewProgramme(item) {
+        const container = document.getElementById('content');
+        container.innerHTML = '';
+        API.showLoading(container);
+
+        try {
+            const dt = new Date(item.dateTime);
+            const dateStr = dt.toISOString().slice(0, 10);
+            const nextDay = new Date(dt);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDateStr = nextDay.toISOString().slice(0, 10);
+
+            const data = await API.fetch('/schedule', {
+                channelId: item.channelId,
+                start: `${dateStr}T00:00:00`,
+                end: `${nextDateStr}T00:00:00`
+            });
+
+            const scheduleItems = data.item || [];
+            const found = scheduleItems.find(si => si.id === item.id);
+
+            if (!found) {
+                container.innerHTML = '';
+                const back = document.createElement('a');
+                back.className = 'back-link';
+                back.innerHTML = '&larr; Back to Review List';
+                back.addEventListener('click', () => App.navigateTo('review'));
+                container.appendChild(back);
+                const msg = document.createElement('div');
+                msg.className = 'empty-state';
+                msg.innerHTML = '<p>This programme is no longer available in the schedule.</p>';
+                container.appendChild(msg);
+                return;
+            }
+
+            ImagesView.showProgrammeDetail(found, {
+                channelName: item.channel,
+                onBack: () => App.navigateTo('review')
+            });
+        } catch (err) {
+            container.innerHTML = '';
+            const back = document.createElement('a');
+            back.className = 'back-link';
+            back.innerHTML = '&larr; Back to Review List';
+            back.addEventListener('click', () => App.navigateTo('review'));
+            container.appendChild(back);
+            const msg = document.createElement('div');
+            msg.className = 'empty-state';
+            msg.innerHTML = `<p>Failed to load programme: ${API.escapeHtml(err.message)}</p>`;
+            container.appendChild(msg);
+        }
     }
 
     function exportExcel() {

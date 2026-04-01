@@ -441,7 +441,8 @@ const ScheduleView = (() => {
         }
 
         panel.firstElementChild.after(API.jsonToggle(item, () => {
-            ReviewStore.openReviewModal(item, channelName, 'schedule');
+            const channelId = (document.getElementById('sch-channel-id') || {}).value || '';
+            ReviewStore.openReviewModal(item, channelName, 'schedule', channelId);
         }));
     }
 
