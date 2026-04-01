@@ -11,6 +11,7 @@ const EpgView = (() => {
 
     // Channel Lookup tab state
     let lookupAllChannels = [];
+    let lookupSelectedChannels = [];
 
     // EPG sort: 1-3 digit numbers first, then 4+ digit numbers, ascending within each group
     function epgSortKey(epgStr) {
@@ -77,14 +78,35 @@ const EpgView = (() => {
                 <div class="filter-bar">
                     <div class="form-group" style="min-width:300px;max-width:400px">
                         <label>Channel</label>
-                        <input type="text" id="lookup-channel-search" class="input" placeholder="Type to search channels..." style="width:100%" autocomplete="off">
+                        <input type="text" id="lookup-channel-search" class="input" placeholder="Type to search and add channels..." style="width:100%" autocomplete="off">
                         <div id="lookup-channel-dropdown" class="channel-dropdown"></div>
-                        <input type="hidden" id="lookup-channel-id">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="lookup-browse-all" class="btn btn-sm btn-secondary">Browse All</button>
                     </div>
                     <div class="form-group">
                         <label>&nbsp;</label>
                         <button id="lookup-btn" class="btn btn-primary">Look Up</button>
                     </div>
+                </div>
+                <div id="lookup-channel-browser" style="display:none;margin-bottom:16px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)">
+                    <div style="display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--color-border)">
+                        <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">ALL CHANNELS</span>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="text" id="lookup-browser-search" class="input" placeholder="Filter..." style="width:180px;height:28px;font-size:12px;padding:2px 8px">
+                            <button id="lookup-unselect-all" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Unselect All</button>
+                            <button id="lookup-browser-close" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Close</button>
+                        </div>
+                    </div>
+                    <div id="lookup-browser-list" style="max-height:300px;overflow-y:auto;padding:8px 14px"></div>
+                </div>
+                <div id="lookup-selected-chips" style="display:none;margin-bottom:16px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">SELECTED CHANNELS</span>
+                        <button id="lookup-clear-all" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px">Clear All</button>
+                    </div>
+                    <div id="lookup-chips-container" style="display:flex;gap:6px;flex-wrap:wrap"></div>
                 </div>
                 <div id="lookup-results"></div>
             </div>
@@ -111,6 +133,19 @@ const EpgView = (() => {
 
         // Channel Lookup tab
         document.getElementById('lookup-btn').addEventListener('click', lookupChannel);
+        document.getElementById('lookup-browse-all').addEventListener('click', toggleLookupBrowser);
+        document.getElementById('lookup-browser-close').addEventListener('click', () => {
+            document.getElementById('lookup-channel-browser').style.display = 'none';
+        });
+        document.getElementById('lookup-browser-search').addEventListener('input', renderLookupBrowser);
+        document.getElementById('lookup-unselect-all').addEventListener('click', () => {
+            lookupSelectedChannels = [];
+            renderLookupChips();
+        });
+        document.getElementById('lookup-clear-all').addEventListener('click', () => {
+            lookupSelectedChannels = [];
+            renderLookupChips();
+        });
         setupLookupChannelSearch();
 
         await loadPlatforms();
@@ -1083,85 +1118,172 @@ const EpgView = (() => {
     function setupLookupChannelSearch() {
         const input = document.getElementById('lookup-channel-search');
         const dropdown = document.getElementById('lookup-channel-dropdown');
-        const hiddenId = document.getElementById('lookup-channel-id');
 
         input.addEventListener('focus', () => { input.select(); });
-        input.addEventListener('input', () => {
-            hiddenId.value = '';
-            showLookupDropdown();
-        });
+        input.addEventListener('input', showLookupDropdown);
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#lookup-channel-search') && !e.target.closest('#lookup-channel-dropdown')) {
                 dropdown.style.display = 'none';
             }
         });
+    }
 
-        function showLookupDropdown() {
-            const query = (input.value || '').toLowerCase().trim();
+    function showLookupDropdown() {
+        const input = document.getElementById('lookup-channel-search');
+        const dropdown = document.getElementById('lookup-channel-dropdown');
+        const query = (input.value || '').toLowerCase().trim();
 
-            if (lookupAllChannels.length === 0) {
-                dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
-                dropdown.style.display = 'block';
-                return;
-            }
-
-            if (!query) {
-                dropdown.style.display = 'none';
-                return;
-            }
-
-            const filtered = lookupAllChannels.filter(ch => (ch.title || '').toLowerCase().includes(query));
-
-            if (filtered.length === 0) {
-                dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
-                dropdown.style.display = 'block';
-                return;
-            }
-
-            dropdown.innerHTML = '';
-            filtered.slice(0, 50).forEach(ch => {
-                const item = document.createElement('div');
-                item.className = 'dropdown-item';
-                item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
-                item.addEventListener('click', () => {
-                    input.value = ch.title;
-                    hiddenId.value = ch.id;
-                    dropdown.style.display = 'none';
-                });
-                dropdown.appendChild(item);
-            });
-
-            if (filtered.length > 50) {
-                const more = document.createElement('div');
-                more.className = 'dropdown-empty';
-                more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
-                dropdown.appendChild(more);
-            }
-
+        if (lookupAllChannels.length === 0) {
+            dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
             dropdown.style.display = 'block';
+            return;
+        }
+
+        if (!query) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        const selectedIds = new Set(lookupSelectedChannels.map(ch => ch.id));
+        const filtered = lookupAllChannels.filter(ch =>
+            !selectedIds.has(ch.id) && (ch.title || '').toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        dropdown.innerHTML = '';
+        filtered.slice(0, 50).forEach(ch => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
+            item.addEventListener('click', () => {
+                lookupSelectedChannels.push({ id: ch.id, title: ch.title });
+                renderLookupChips();
+                input.value = '';
+                dropdown.style.display = 'none';
+                input.focus();
+            });
+            dropdown.appendChild(item);
+        });
+
+        if (filtered.length > 50) {
+            const more = document.createElement('div');
+            more.className = 'dropdown-empty';
+            more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
+            dropdown.appendChild(more);
+        }
+
+        dropdown.style.display = 'block';
+    }
+
+    function renderLookupChips() {
+        const wrapper = document.getElementById('lookup-selected-chips');
+        const container = document.getElementById('lookup-chips-container');
+
+        if (lookupSelectedChannels.length === 0) {
+            wrapper.style.display = 'none';
+            renderLookupBrowser();
+            return;
+        }
+
+        wrapper.style.display = 'block';
+        container.innerHTML = '';
+        lookupSelectedChannels.forEach(ch => {
+            const chip = document.createElement('span');
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 8px 4px 10px;background:var(--color-accent);color:#fff;border-radius:14px;font-size:12px;font-weight:500';
+            chip.innerHTML = `${API.escapeHtml(ch.title)}<button style="background:none;border:none;color:#fff;cursor:pointer;font-size:15px;line-height:1;padding:0 2px" title="Remove">&times;</button>`;
+            chip.querySelector('button').addEventListener('click', () => {
+                lookupSelectedChannels = lookupSelectedChannels.filter(c => c.id !== ch.id);
+                renderLookupChips();
+            });
+            container.appendChild(chip);
+        });
+
+        renderLookupBrowser();
+    }
+
+    function toggleLookupBrowser() {
+        const browser = document.getElementById('lookup-channel-browser');
+        const isVisible = browser.style.display !== 'none';
+        if (isVisible) {
+            browser.style.display = 'none';
+        } else {
+            browser.style.display = '';
+            renderLookupBrowser();
         }
     }
 
-    async function lookupChannel() {
-        const channelId = document.getElementById('lookup-channel-id').value;
-        const results = document.getElementById('lookup-results');
+    function renderLookupBrowser() {
+        const browser = document.getElementById('lookup-channel-browser');
+        if (browser.style.display === 'none') return;
 
-        if (!channelId) {
-            API.toast('Please select a channel from the dropdown.', 'warning');
+        const listDiv = document.getElementById('lookup-browser-list');
+        const searchQuery = (document.getElementById('lookup-browser-search').value || '').toLowerCase().trim();
+        const selectedIds = new Set(lookupSelectedChannels.map(ch => ch.id));
+
+        const matched = searchQuery
+            ? lookupAllChannels.filter(ch => (ch.title || '').toLowerCase().includes(searchQuery))
+            : lookupAllChannels;
+
+        if (matched.length === 0) {
+            listDiv.innerHTML = '<div style="padding:12px;color:var(--color-text-secondary);font-size:13px">No channels match the current filter.</div>';
             return;
         }
+
+        listDiv.innerHTML = '';
+        matched.forEach(ch => {
+            const row = document.createElement('label');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px';
+            row.innerHTML = `
+                <input type="checkbox" data-channel-id="${API.escapeHtml(ch.id)}" ${selectedIds.has(ch.id) ? 'checked' : ''}>
+                <span>${API.escapeHtml(ch.title)}</span>
+            `;
+            row.querySelector('input').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    if (!selectedIds.has(ch.id)) {
+                        lookupSelectedChannels.push({ id: ch.id, title: ch.title });
+                        selectedIds.add(ch.id);
+                        renderLookupChips();
+                    }
+                } else {
+                    lookupSelectedChannels = lookupSelectedChannels.filter(c => c.id !== ch.id);
+                    selectedIds.delete(ch.id);
+                    renderLookupChips();
+                }
+            });
+            listDiv.appendChild(row);
+        });
+    }
+
+    async function lookupChannel() {
+        const results = document.getElementById('lookup-results');
+
+        if (lookupSelectedChannels.length === 0) {
+            API.toast('Please select at least one channel.', 'warning');
+            return;
+        }
+
+        const selectedIds = new Set(lookupSelectedChannels.map(ch => ch.id));
+        const channelTitleMap = {};
+        lookupSelectedChannels.forEach(ch => { channelTitleMap[ch.id] = ch.title; });
 
         API.showLoading(results);
 
-        // Step 1: Fetch full channel details
-        let channelInfo;
-        try {
-            channelInfo = await API.fetch(`/channel/${channelId}`);
-        } catch (err) {
-            API.showError(results, `Failed to load channel details.`);
-            return;
-        }
+        // Step 1: Fetch full channel details for all selected channels
+        const channelInfos = {};
+        const detailPromises = lookupSelectedChannels.map(async (ch) => {
+            try {
+                channelInfos[ch.id] = await API.fetch(`/channel/${ch.id}`);
+            } catch (err) {
+                channelInfos[ch.id] = { id: ch.id, title: ch.title };
+            }
+        });
+        await Promise.all(detailPromises);
 
         // Step 2: Ensure platforms are loaded
         if (platforms.length === 0) {
@@ -1174,7 +1296,7 @@ const EpgView = (() => {
             }
         }
 
-        // Step 3: Scan all platforms for this channel
+        // Step 3: Scan all platforms for any selected channel
         const platformResults = [];
         const batchSize = 5;
 
@@ -1188,13 +1310,10 @@ const EpgView = (() => {
                 try {
                     const data = await API.fetch('/channel', { platformId: p.id });
                     const channels = data.item || [];
-                    const match = channels.find(ch => ch.id === channelId);
-                    if (match) {
+                    if (channels.some(ch => selectedIds.has(ch.id))) {
                         return { platform: p, found: true };
                     }
-                } catch (err) {
-                    // Skip platform on error
-                }
+                } catch (err) { /* skip */ }
                 return { platform: p, found: false };
             });
             const batchResults = await Promise.all(promises);
@@ -1207,12 +1326,11 @@ const EpgView = (() => {
 
         if (platformResults.length === 0) {
             results.innerHTML = '';
-            renderLookupChannelHeader(results, channelInfo);
-            API.showEmpty(results, 'This channel was not found on any platform.');
+            API.showEmpty(results, 'Selected channel(s) were not found on any platform.');
             return;
         }
 
-        // Step 4: For each matching platform, fetch regions and per-region EPG
+        // Step 4: For each matching platform, fetch regions and per-region EPG for all selected channels
         results.innerHTML = `
             <div class="spinner">Loading EPG data... 0 / ${platformResults.length} platform(s)</div>
         `;
@@ -1228,38 +1346,39 @@ const EpgView = (() => {
             try {
                 const data = await API.fetch(`/platform/${p.id}/region`);
                 pRegions = data.item || data || [];
-            } catch (err) {
-                // no regions
-            }
+            } catch (err) { /* no regions */ }
 
+            // regionEpgs entries now include channelId and channelTitle
             const regionEpgs = [];
 
             if (pRegions.length === 0) {
-                // Platform has no regions — try to get EPG from unfiltered channel list
                 try {
                     const data = await API.fetch('/channel', { platformId: p.id });
-                    const match = (data.item || []).find(ch => ch.id === channelId);
-                    if (match && match.epg) {
-                        regionEpgs.push({ region: '(No regions)', epg: match.epg });
-                    }
+                    (data.item || []).forEach(ch => {
+                        if (selectedIds.has(ch.id) && ch.epg) {
+                            regionEpgs.push({ region: '(No regions)', channelId: ch.id, channelTitle: channelTitleMap[ch.id], epg: ch.epg });
+                        }
+                    });
                 } catch (err) { /* skip */ }
             } else {
-                // Fetch per-region in batches
                 for (let j = 0; j < pRegions.length; j += batchSize) {
                     const rBatch = pRegions.slice(j, j + batchSize);
                     const rPromises = rBatch.map(async (r) => {
                         const rName = r.title || r.name || 'Unnamed';
                         try {
                             const data = await API.fetch('/channel', { platformId: p.id, regionId: r.id });
-                            const match = (data.item || []).find(ch => ch.id === channelId);
-                            if (match && match.epg) {
-                                return { region: rName, epg: match.epg };
-                            }
+                            const matches = [];
+                            (data.item || []).forEach(ch => {
+                                if (selectedIds.has(ch.id) && ch.epg) {
+                                    matches.push({ region: rName, channelId: ch.id, channelTitle: channelTitleMap[ch.id], epg: ch.epg });
+                                }
+                            });
+                            return matches;
                         } catch (err) { /* skip */ }
-                        return null;
+                        return [];
                     });
                     const rResults = await Promise.all(rPromises);
-                    rResults.filter(Boolean).forEach(r => regionEpgs.push(r));
+                    rResults.forEach(matches => matches.forEach(m => regionEpgs.push(m)));
                 }
             }
 
@@ -1269,36 +1388,112 @@ const EpgView = (() => {
         }
 
         // Step 5: Render results
-        renderLookupResults(results, channelInfo, platformEpgData);
+        renderLookupResults(results, channelInfos, platformEpgData);
     }
 
-    function renderLookupChannelHeader(container, ch) {
-        const cats = (ch.category || []).map(c => c.name).join(', ');
-        const attrs = (ch.attribute || []).map(a =>
-            `<span class="badge ${a === 'hd' ? 'badge-green' : 'badge-gray'}">${API.escapeHtml(a)}</span>`
-        ).join(' ');
+    function renderLookupChannelHeader(container, channelInfos) {
+        const ids = Object.keys(channelInfos);
+        if (ids.length === 1) {
+            const ch = channelInfos[ids[0]];
+            const cats = (ch.category || []).map(c => c.name).join(', ');
+            const attrs = (ch.attribute || []).map(a =>
+                `<span class="badge ${a === 'hd' ? 'badge-green' : 'badge-gray'}">${API.escapeHtml(a)}</span>`
+            ).join(' ');
 
-        const header = document.createElement('div');
-        header.style.cssText = 'padding:16px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;margin-bottom:16px';
-        header.innerHTML = `
-            <h3 style="margin:0 0 8px 0">${API.escapeHtml(ch.title)}</h3>
-            <div style="font-size:13px;color:var(--color-text-secondary);display:flex;gap:16px;flex-wrap:wrap">
-                <span><strong>ID:</strong> <code style="font-size:12px;user-select:all">${API.escapeHtml(ch.id)}</code></span>
-                ${cats ? `<span><strong>Category:</strong> ${API.escapeHtml(cats)}</span>` : ''}
-                ${attrs ? `<span><strong>Attributes:</strong> ${attrs}</span>` : ''}
-            </div>
-        `;
-        container.appendChild(header);
+            const header = document.createElement('div');
+            header.style.cssText = 'padding:16px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;margin-bottom:16px';
+            header.innerHTML = `
+                <h3 style="margin:0 0 8px 0">${API.escapeHtml(ch.title)}</h3>
+                <div style="font-size:13px;color:var(--color-text-secondary);display:flex;gap:16px;flex-wrap:wrap">
+                    <span><strong>ID:</strong> <code style="font-size:12px;user-select:all">${API.escapeHtml(ch.id)}</code></span>
+                    ${cats ? `<span><strong>Category:</strong> ${API.escapeHtml(cats)}</span>` : ''}
+                    ${attrs ? `<span><strong>Attributes:</strong> ${attrs}</span>` : ''}
+                </div>
+            `;
+            container.appendChild(header);
+        } else {
+            const header = document.createElement('div');
+            header.style.cssText = 'padding:12px 16px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;margin-bottom:16px';
+            header.innerHTML = `<div style="font-size:13px;color:var(--color-text-secondary)"><strong>${ids.length} channels selected:</strong> ${ids.map(id => API.escapeHtml(channelInfos[id].title)).join(', ')}</div>`;
+            container.appendChild(header);
+        }
     }
 
-    function renderLookupResults(container, channelInfo, platformEpgData) {
+    function renderLookupResults(container, channelInfos, platformEpgData) {
         container.innerHTML = '';
 
-        renderLookupChannelHeader(container, channelInfo);
+        renderLookupChannelHeader(container, channelInfos);
 
         if (platformEpgData.length === 0) {
-            API.showEmpty(container, 'No EPG numbers found for this channel on any platform.');
+            API.showEmpty(container, 'No EPG numbers found for selected channel(s) on any platform.');
             return;
+        }
+
+        const platformNames = platformEpgData.map(d => d.platform.title);
+        const channelIds = lookupSelectedChannels.map(ch => ch.id);
+        const multiChannel = channelIds.length > 1;
+
+        // Build lookup: platformIndex → { regionName → { channelId → epg } }
+        const noRegionPlatforms = new Set();
+        const platformLookup = platformEpgData.map(({ regionEpgs }, idx) => {
+            const map = {};
+            regionEpgs.forEach(({ region, channelId, epg }) => {
+                if (region === '(No regions)') noRegionPlatforms.add(idx);
+                if (!map[region]) map[region] = {};
+                map[region][channelId] = epg;
+            });
+            return map;
+        });
+
+        // Collect all unique region names across all platforms (excluding no-region marker)
+        const allRegions = new Set();
+        platformEpgData.forEach(({ regionEpgs }) => {
+            regionEpgs.forEach(r => {
+                if (r.region !== '(No regions)') allRegions.add(r.region);
+            });
+        });
+
+        // Organize regions by country
+        const countryOrder = ['England', 'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'];
+        const regionsByCountry = {};
+        countryOrder.forEach(c => { regionsByCountry[c] = []; });
+        allRegions.forEach(r => {
+            const country = classifyRegion(r);
+            if (!regionsByCountry[country]) regionsByCountry[country] = [];
+            regionsByCountry[country].push(r);
+        });
+        Object.values(regionsByCountry).forEach(arr => arr.sort((a, b) => a.localeCompare(b)));
+
+        // Build ordered rows: { region, channelId, channelTitle, country }
+        // Only include rows where the channel has an EPG on at least one platform
+        const rows = [];
+
+        function channelHasEpgInRegion(region, chId) {
+            return platformLookup.some(map =>
+                (map[region] && map[region][chId]) ||
+                (noRegionPlatforms.size > 0 && map['(No regions)'] && map['(No regions)'][chId])
+            );
+        }
+
+        if (allRegions.size === 0 && noRegionPlatforms.size > 0) {
+            // Only no-region platforms
+            channelIds.forEach(chId => {
+                if (channelHasEpgInRegion('(No regions)', chId)) {
+                    rows.push({ region: 'All regions', channelId: chId, channelTitle: channelInfos[chId]?.title || chId, country: null });
+                }
+            });
+        } else {
+            countryOrder.forEach(country => {
+                const regions = regionsByCountry[country];
+                if (!regions || regions.length === 0) return;
+                regions.forEach(region => {
+                    channelIds.forEach(chId => {
+                        if (channelHasEpgInRegion(region, chId)) {
+                            rows.push({ region, channelId: chId, channelTitle: channelInfos[chId]?.title || chId, country });
+                        }
+                    });
+                });
+            });
         }
 
         const info = document.createElement('div');
@@ -1306,159 +1501,48 @@ const EpgView = (() => {
         info.textContent = `Found on ${platformEpgData.length} platform(s)`;
         container.appendChild(info);
 
-        // Build a cross-reference: rows = regions/countries, columns = platforms
-        const platformNames = platformEpgData.map(d => d.platform.title);
-        const countryOrder = ['England', 'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'];
-
-        // For each platform, group its regions by country and consolidate where EPGs match
-        // Result: per platform, an array of { label, epg, isCountry } display rows
-        const platformCountryEpgs = platformEpgData.map(({ regionEpgs }) => {
-            // Check for no-region platforms
-            if (regionEpgs.length === 1 && regionEpgs[0].region === '(No regions)') {
-                return { rows: [{ label: 'All regions', epg: regionEpgs[0].epg }], noRegions: true };
-            }
-
-            const countryGroups = {};
-            regionEpgs.forEach(r => {
-                const country = classifyRegion(r.region);
-                if (!countryGroups[country]) countryGroups[country] = [];
-                countryGroups[country].push(r);
-            });
-
-            const rows = [];
-            countryOrder.forEach(country => {
-                const group = countryGroups[country];
-                if (!group || group.length === 0) return;
-                const uniqueEpgs = [...new Set(group.map(r => r.epg))];
-                if (uniqueEpgs.length === 1) {
-                    rows.push({ label: country, epg: uniqueEpgs[0], isCountry: true, sourceRegions: group.map(r => r.region) });
-                } else {
-                    group.forEach(r => {
-                        rows.push({ label: r.region, epg: r.epg, isCountry: false, country });
-                    });
-                }
-            });
-            return { rows, noRegions: false };
-        });
-
-        // Collect all unique row labels across all platforms, in country order
-        const allRowLabels = [];
-        const rowCountryMap = {};
-        countryOrder.forEach(country => {
-            // Check if any platform uses this country as a consolidated row
-            const asCountry = platformCountryEpgs.some(p => !p.noRegions && p.rows.some(r => r.label === country && r.isCountry));
-            // Check if any platform expands this country into individual regions
-            const expandedRegions = [];
-            platformCountryEpgs.forEach(p => {
-                if (p.noRegions) return;
-                p.rows.filter(r => !r.isCountry && r.country === country).forEach(r => {
-                    if (!expandedRegions.includes(r.label)) expandedRegions.push(r.label);
-                });
-            });
-
-            if (asCountry && expandedRegions.length === 0) {
-                // All platforms that have this country use it consolidated
-                allRowLabels.push(country);
-                rowCountryMap[country] = country;
-            } else if (expandedRegions.length > 0) {
-                // At least one platform expands — list all individual regions
-                // Also include regions from platforms that consolidated (they'll show the country EPG for each)
-                const allRegionsForCountry = new Set(expandedRegions);
-                platformCountryEpgs.forEach(p => {
-                    if (p.noRegions) return;
-                    p.rows.filter(r => r.isCountry && r.label === country).forEach(() => {
-                        // This platform consolidated — we need to know which regions it covers
-                        // Use the raw regionEpgs to find them
-                    });
-                });
-                // Get all regions for this country across all platforms
-                platformEpgData.forEach(({ regionEpgs }) => {
-                    regionEpgs.forEach(r => {
-                        if (classifyRegion(r.region) === country) allRegionsForCountry.add(r.region);
-                    });
-                });
-                const sortedRegions = [...allRegionsForCountry].sort((a, b) => a.localeCompare(b));
-                sortedRegions.forEach(r => {
-                    allRowLabels.push(r);
-                    rowCountryMap[r] = country;
-                });
-            } else if (!asCountry) {
-                // No platform has this country at all — skip
-            }
-        });
-
-        // Handle no-region platforms: add a single "All regions" row if needed
-        const hasNoRegionPlatform = platformCountryEpgs.some(p => p.noRegions);
-        if (hasNoRegionPlatform && allRowLabels.length === 0) {
-            allRowLabels.push('All regions');
-        }
-
-        // Build lookup: for each platform index, map rowLabel → EPG
-        const platformEpgByRow = platformEpgData.map(({ regionEpgs }, idx) => {
-            const pData = platformCountryEpgs[idx];
-            const map = {};
-            if (pData.noRegions) {
-                // No-region platform: show its EPG for every row
-                allRowLabels.forEach(label => {
-                    map[label] = regionEpgs[0].epg;
-                });
-            } else {
-                allRowLabels.forEach(label => {
-                    // Check if this platform has a consolidated country row matching this label
-                    const countryRow = pData.rows.find(r => r.isCountry && r.label === label);
-                    if (countryRow) {
-                        map[label] = countryRow.epg;
-                        return;
-                    }
-                    // Check if this platform has this exact region
-                    const regionRow = pData.rows.find(r => !r.isCountry && r.label === label);
-                    if (regionRow) {
-                        map[label] = regionRow.epg;
-                        return;
-                    }
-                    // Check if this platform consolidated the country that this region belongs to
-                    const country = rowCountryMap[label];
-                    if (country) {
-                        const consolidated = pData.rows.find(r => r.isCountry && r.label === country);
-                        if (consolidated && consolidated.sourceRegions && consolidated.sourceRegions.includes(label)) {
-                            map[label] = consolidated.epg;
-                            return;
-                        }
-                    }
-                    map[label] = null;
-                });
-            }
-            return map;
-        });
-
         // Render table
         const table = document.createElement('table');
         table.className = 'data-table';
 
-        // Header row
+        const colSpan = (multiChannel ? 2 : 1) + platformNames.length;
         let thead = '<thead><tr><th style="min-width:180px">Region</th>';
+        if (multiChannel) thead += '<th style="min-width:180px">Channel</th>';
         platformNames.forEach(name => {
             thead += `<th style="text-align:center;min-width:80px">${API.escapeHtml(name)}</th>`;
         });
         thead += '</tr></thead>';
 
-        // Body rows, grouped by country
         let tbody = '<tbody>';
         let lastCountry = null;
-        allRowLabels.forEach(label => {
-            const country = rowCountryMap[label];
-            // Insert country separator if this is an individual region and country changed
-            if (country && country !== label && country !== lastCountry) {
-                tbody += `<tr><td colspan="${platformNames.length + 1}" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
-                lastCountry = country;
-            }
-            if (country === label) lastCountry = country;
+        let lastRegion = null;
 
-            const isIndented = country && country !== label;
+        rows.forEach(({ region, channelId, channelTitle, country }) => {
+            // Country separator
+            if (country && country !== lastCountry) {
+                tbody += `<tr><td colspan="${colSpan}" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
+                lastCountry = country;
+                lastRegion = null;
+            }
+
+            const showRegion = region !== lastRegion;
+            lastRegion = region;
+
             tbody += '<tr>';
-            tbody += `<td style="${isIndented ? 'padding-left:24px' : ''}"><strong>${API.escapeHtml(label)}</strong></td>`;
-            platformEpgByRow.forEach(map => {
-                const epg = map[label];
+            if (multiChannel && !showRegion) {
+                tbody += '<td></td>';
+            } else {
+                tbody += `<td style="${country ? 'padding-left:24px' : ''}"><strong>${API.escapeHtml(region)}</strong></td>`;
+            }
+            if (multiChannel) {
+                tbody += `<td>${API.escapeHtml(channelTitle)}</td>`;
+            }
+
+            platformLookup.forEach((map, pIdx) => {
+                let epg = map[region] && map[region][channelId];
+                if (!epg && noRegionPlatforms.has(pIdx) && map['(No regions)']) {
+                    epg = map['(No regions)'][channelId];
+                }
                 if (epg) {
                     tbody += `<td style="text-align:center"><strong>${API.escapeHtml(epg)}</strong></td>`;
                 } else {
