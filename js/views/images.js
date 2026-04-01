@@ -1334,7 +1334,8 @@ function getDateRange() {
             summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totalAll} programmes total, <strong style="color:var(--color-text-secondary)">${totalExcluded}</strong> excluded (off-air)`;
         } else {
             const excludedNote = totalExcluded > 0 ? ` <span style="color:var(--color-text-secondary);font-size:13px">(${totalExcluded} off-air excluded)</span>` : '';
-            summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, <strong style="color:var(--color-success)">${totals.with}</strong> with ${modeLabel.toLowerCase()} images (${totalPct}%), <strong style="color:${totals.without > 0 ? 'var(--color-error)' : 'var(--color-success)'}">${totals.without}</strong> missing${excludedNote}`;
+            const withLabel = mode === 'any' ? 'with at least one image' : `with ${modeLabel.toLowerCase()} images`;
+            summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, <strong style="color:var(--color-success)">${totals.with}</strong> ${withLabel} (${totalPct}%), <strong style="color:${totals.without > 0 ? 'var(--color-error)' : 'var(--color-success)'}">${totals.without}</strong> missing${excludedNote}`;
         }
         container.appendChild(summaryDiv);
 
