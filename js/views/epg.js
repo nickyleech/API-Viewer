@@ -1501,15 +1501,20 @@ const EpgView = (() => {
         info.textContent = `Found on ${platformEpgData.length} platform(s)`;
         container.appendChild(info);
 
-        // Render table
+        // Render table in a scrollable wrapper with sticky header
+        const scrollWrap = document.createElement('div');
+        scrollWrap.style.cssText = 'overflow:auto;max-height:70vh';
+
         const table = document.createElement('table');
         table.className = 'data-table';
+        table.style.cssText = 'border-collapse:separate;border-spacing:0';
 
+        const stickyTh = 'position:sticky;top:0;z-index:2;background:var(--color-bg)';
         const colSpan = (multiChannel ? 2 : 1) + platformNames.length;
-        let thead = '<thead><tr><th style="min-width:180px">Region</th>';
-        if (multiChannel) thead += '<th style="min-width:180px">Channel</th>';
+        let thead = `<thead><tr><th style="min-width:180px;${stickyTh}">Region</th>`;
+        if (multiChannel) thead += `<th style="min-width:180px;${stickyTh}">Channel</th>`;
         platformNames.forEach(name => {
-            thead += `<th style="text-align:center;min-width:80px">${API.escapeHtml(name)}</th>`;
+            thead += `<th style="text-align:center;min-width:80px;${stickyTh}">${API.escapeHtml(name)}</th>`;
         });
         thead += '</tr></thead>';
 
@@ -1554,7 +1559,8 @@ const EpgView = (() => {
         tbody += '</tbody>';
 
         table.innerHTML = thead + tbody;
-        container.appendChild(table);
+        scrollWrap.appendChild(table);
+        container.appendChild(scrollWrap);
     }
 
     return { render };
