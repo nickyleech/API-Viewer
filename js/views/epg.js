@@ -9,6 +9,9 @@ const EpgView = (() => {
     let varRegionData = null;
     let varVariations = [];
 
+    // Channel Lookup tab state
+    let lookupAllChannels = [];
+
     // EPG sort: 1-3 digit numbers first, then 4+ digit numbers, ascending within each group
     function epgSortKey(epgStr) {
         const s = String(epgStr);
@@ -25,6 +28,7 @@ const EpgView = (() => {
             <div class="view-tabs">
                 <button class="view-tab active" data-tab="epg-numbers">EPG Numbers</button>
                 <button class="view-tab" data-tab="variations">Variations</button>
+                <button class="view-tab" data-tab="channel-lookup">Channel Lookup</button>
             </div>
 
             <div id="tab-epg-numbers" class="tab-panel active">
@@ -68,6 +72,26 @@ const EpgView = (() => {
                 </div>
                 <div id="var-results"></div>
             </div>
+
+            <div id="tab-channel-lookup" class="tab-panel">
+                <div class="filter-bar">
+                    <div class="form-group" style="min-width:250px">
+                        <label>Search</label>
+                        <input type="text" id="lookup-search" class="input" placeholder="Filter by channel name..." style="width:100%">
+                    </div>
+                    <div class="form-group" style="flex:1;min-width:300px">
+                        <label>Channel</label>
+                        <select id="lookup-channel-id" class="select" style="width:100%">
+                            <option value="">Loading channels...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button id="lookup-btn" class="btn btn-primary">Look Up</button>
+                    </div>
+                </div>
+                <div id="lookup-results"></div>
+            </div>
         `;
 
         // Tab switching
@@ -89,7 +113,12 @@ const EpgView = (() => {
         // Variations tab
         document.getElementById('var-load').addEventListener('click', loadVariationsForPlatform);
 
+        // Channel Lookup tab
+        document.getElementById('lookup-btn').addEventListener('click', lookupChannel);
+        document.getElementById('lookup-search').addEventListener('input', filterLookupChannels);
+
         await loadPlatforms();
+        loadLookupChannels();
     }
 
     async function loadPlatforms() {
@@ -1042,6 +1071,293 @@ const EpgView = (() => {
 
         XLSX.writeFile(wb, 'EPG_Variations_All_Platforms.xlsx');
         API.toast(`Excel file downloaded with ${sheetsAdded} platform sheet(s).`, 'success');
+    }
+
+    // --- Channel Lookup tab ---
+
+    async function loadLookupChannels() {
+        const sel = document.getElementById('lookup-channel-id');
+        try {
+            const data = await API.fetch('/channel');
+            lookupAllChannels = (data.item || []).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            populateLookupSelect(lookupAllChannels);
+        } catch (err) {
+            sel.innerHTML = '<option value="">Error loading channels</option>';
+        }
+    }
+
+    function populateLookupSelect(channels) {
+        const sel = document.getElementById('lookup-channel-id');
+        sel.innerHTML = '<option value="">-- Select a Channel --</option>';
+        channels.forEach(ch => {
+            sel.innerHTML += `<option value="${API.escapeHtml(ch.id)}">${API.escapeHtml(ch.title)}</option>`;
+        });
+    }
+
+    function filterLookupChannels() {
+        const query = (document.getElementById('lookup-search').value || '').toLowerCase().trim();
+        const filtered = query
+            ? lookupAllChannels.filter(ch => (ch.title || '').toLowerCase().includes(query))
+            : lookupAllChannels;
+        populateLookupSelect(filtered);
+    }
+
+    async function lookupChannel() {
+        const channelId = document.getElementById('lookup-channel-id').value;
+        const results = document.getElementById('lookup-results');
+
+        if (!channelId) {
+            API.toast('Please select a channel.', 'warning');
+            return;
+        }
+
+        API.showLoading(results);
+
+        // Step 1: Fetch full channel details
+        let channelInfo;
+        try {
+            channelInfo = await API.fetch(`/channel/${channelId}`);
+        } catch (err) {
+            API.showError(results, `Failed to load channel details.`);
+            return;
+        }
+
+        // Step 2: Ensure platforms are loaded
+        if (platforms.length === 0) {
+            try {
+                const data = await API.fetch('/platform');
+                platforms = data.item || [];
+            } catch (err) {
+                API.showError(results, 'Failed to load platforms.');
+                return;
+            }
+        }
+
+        // Step 3: Scan all platforms for this channel
+        const platformResults = [];
+        const batchSize = 5;
+
+        results.innerHTML = `
+            <div class="spinner">Scanning platforms... 0 / ${platforms.length}</div>
+        `;
+
+        for (let i = 0; i < platforms.length; i += batchSize) {
+            const batch = platforms.slice(i, i + batchSize);
+            const promises = batch.map(async (p) => {
+                try {
+                    const data = await API.fetch('/channel', { platformId: p.id });
+                    const channels = data.item || [];
+                    const match = channels.find(ch => ch.id === channelId);
+                    if (match) {
+                        return { platform: p, found: true };
+                    }
+                } catch (err) {
+                    // Skip platform on error
+                }
+                return { platform: p, found: false };
+            });
+            const batchResults = await Promise.all(promises);
+            batchResults.filter(r => r.found).forEach(r => platformResults.push(r.platform));
+
+            const done = Math.min(i + batchSize, platforms.length);
+            const spinner = results.querySelector('.spinner');
+            if (spinner) spinner.textContent = `Scanning platforms... ${done} / ${platforms.length}`;
+        }
+
+        if (platformResults.length === 0) {
+            results.innerHTML = '';
+            renderLookupChannelHeader(results, channelInfo);
+            API.showEmpty(results, 'This channel was not found on any platform.');
+            return;
+        }
+
+        // Step 4: For each matching platform, fetch regions and per-region EPG
+        results.innerHTML = `
+            <div class="spinner">Loading EPG data... 0 / ${platformResults.length} platform(s)</div>
+        `;
+
+        const platformEpgData = [];
+
+        for (let i = 0; i < platformResults.length; i++) {
+            const p = platformResults[i];
+            const spinner = results.querySelector('.spinner');
+            if (spinner) spinner.textContent = `Loading EPG data for ${p.title}... ${i + 1} / ${platformResults.length} platform(s)`;
+
+            let pRegions = [];
+            try {
+                const data = await API.fetch(`/platform/${p.id}/region`);
+                pRegions = data.item || data || [];
+            } catch (err) {
+                // no regions
+            }
+
+            const regionEpgs = [];
+
+            if (pRegions.length === 0) {
+                // Platform has no regions — try to get EPG from unfiltered channel list
+                try {
+                    const data = await API.fetch('/channel', { platformId: p.id });
+                    const match = (data.item || []).find(ch => ch.id === channelId);
+                    if (match && match.epg) {
+                        regionEpgs.push({ region: '(No regions)', epg: match.epg });
+                    }
+                } catch (err) { /* skip */ }
+            } else {
+                // Fetch per-region in batches
+                for (let j = 0; j < pRegions.length; j += batchSize) {
+                    const rBatch = pRegions.slice(j, j + batchSize);
+                    const rPromises = rBatch.map(async (r) => {
+                        const rName = r.title || r.name || 'Unnamed';
+                        try {
+                            const data = await API.fetch('/channel', { platformId: p.id, regionId: r.id });
+                            const match = (data.item || []).find(ch => ch.id === channelId);
+                            if (match && match.epg) {
+                                return { region: rName, epg: match.epg };
+                            }
+                        } catch (err) { /* skip */ }
+                        return null;
+                    });
+                    const rResults = await Promise.all(rPromises);
+                    rResults.filter(Boolean).forEach(r => regionEpgs.push(r));
+                }
+            }
+
+            if (regionEpgs.length > 0) {
+                platformEpgData.push({ platform: p, regionEpgs });
+            }
+        }
+
+        // Step 5: Render results
+        renderLookupResults(results, channelInfo, platformEpgData);
+    }
+
+    function renderLookupChannelHeader(container, ch) {
+        const cats = (ch.category || []).map(c => c.name).join(', ');
+        const attrs = (ch.attribute || []).map(a =>
+            `<span class="badge ${a === 'hd' ? 'badge-green' : 'badge-gray'}">${API.escapeHtml(a)}</span>`
+        ).join(' ');
+
+        const header = document.createElement('div');
+        header.style.cssText = 'padding:16px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;margin-bottom:16px';
+        header.innerHTML = `
+            <h3 style="margin:0 0 8px 0">${API.escapeHtml(ch.title)}</h3>
+            <div style="font-size:13px;color:var(--color-text-secondary);display:flex;gap:16px;flex-wrap:wrap">
+                <span><strong>ID:</strong> <code style="font-size:12px;user-select:all">${API.escapeHtml(ch.id)}</code></span>
+                ${cats ? `<span><strong>Category:</strong> ${API.escapeHtml(cats)}</span>` : ''}
+                ${attrs ? `<span><strong>Attributes:</strong> ${attrs}</span>` : ''}
+            </div>
+        `;
+        container.appendChild(header);
+    }
+
+    function renderLookupResults(container, channelInfo, platformEpgData) {
+        container.innerHTML = '';
+
+        renderLookupChannelHeader(container, channelInfo);
+
+        if (platformEpgData.length === 0) {
+            API.showEmpty(container, 'No EPG numbers found for this channel on any platform.');
+            return;
+        }
+
+        const info = document.createElement('div');
+        info.className = 'results-info';
+        info.textContent = `Found on ${platformEpgData.length} platform(s)`;
+        container.appendChild(info);
+
+        platformEpgData.forEach(({ platform, regionEpgs }) => {
+            const card = document.createElement('div');
+            card.style.cssText = 'border:1px solid var(--color-border);border-radius:8px;margin-bottom:12px;overflow:hidden';
+
+            // Check if all regions share the same EPG
+            const uniqueEpgs = [...new Set(regionEpgs.map(r => r.epg))];
+            const allSame = uniqueEpgs.length === 1;
+
+            // Platform header
+            const cardHeader = document.createElement('div');
+            cardHeader.style.cssText = 'padding:12px 16px;background:var(--color-surface);border-bottom:1px solid var(--color-border);display:flex;justify-content:space-between;align-items:center;cursor:pointer';
+            cardHeader.innerHTML = `
+                <div>
+                    <strong>${API.escapeHtml(platform.title)}</strong>
+                    <span style="color:var(--color-text-secondary);font-size:13px;margin-left:8px">${regionEpgs.length} region(s)</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    ${allSame ? `<span class="badge badge-green">EPG ${API.escapeHtml(uniqueEpgs[0])}</span>` : `<span class="badge badge-orange">${uniqueEpgs.length} different EPG numbers</span>`}
+                    <span class="lookup-chevron" style="font-size:18px;transition:transform 0.2s">&#9660;</span>
+                </div>
+            `;
+            card.appendChild(cardHeader);
+
+            // Region table (collapsible body)
+            const cardBody = document.createElement('div');
+            cardBody.style.cssText = 'padding:0';
+
+            const table = document.createElement('table');
+            table.className = 'data-table';
+            table.style.cssText = 'margin:0;border:none;border-radius:0';
+
+            // Group regions by country if there are multiple
+            if (regionEpgs.length > 1 && regionEpgs[0].region !== '(No regions)') {
+                const mode = allSame ? uniqueEpgs[0] : getMode(
+                    regionEpgs.reduce((acc, r) => { acc[r.region] = r.epg; return acc; }, {})
+                );
+
+                // Group by country
+                const countryGroups = {};
+                regionEpgs.forEach(r => {
+                    const country = classifyRegion(r.region);
+                    if (!countryGroups[country]) countryGroups[country] = [];
+                    countryGroups[country].push(r);
+                });
+
+                const countryOrder = ['England', 'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'];
+
+                let thead = '<thead><tr><th>Region</th><th style="text-align:center;width:100px">EPG #</th></tr></thead>';
+                let tbody = '<tbody>';
+
+                countryOrder.forEach(country => {
+                    const group = countryGroups[country];
+                    if (!group || group.length === 0) return;
+
+                    // Country separator row
+                    tbody += `<tr><td colspan="2" style="background:var(--color-surface);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-secondary);padding:6px 12px">${API.escapeHtml(country)}</td></tr>`;
+
+                    group.forEach(r => {
+                        const epgMatch = String(r.epg) === String(mode);
+                        const bgColor = allSame ? '' : (epgMatch ? 'background-color:rgba(76,175,80,0.1)' : 'background-color:rgba(255,152,0,0.1)');
+                        tbody += `<tr style="${bgColor}">
+                            <td style="padding-left:24px">${API.escapeHtml(r.region)}</td>
+                            <td style="text-align:center"><strong>${API.escapeHtml(r.epg)}</strong></td>
+                        </tr>`;
+                    });
+                });
+
+                tbody += '</tbody>';
+                table.innerHTML = thead + tbody;
+            } else {
+                table.innerHTML = `
+                    <thead><tr><th>Region</th><th style="text-align:center;width:100px">EPG #</th></tr></thead>
+                    <tbody>${regionEpgs.map(r => `
+                        <tr>
+                            <td>${API.escapeHtml(r.region)}</td>
+                            <td style="text-align:center"><strong>${API.escapeHtml(r.epg)}</strong></td>
+                        </tr>
+                    `).join('')}</tbody>
+                `;
+            }
+
+            cardBody.appendChild(table);
+            card.appendChild(cardBody);
+
+            // Collapse/expand toggle
+            cardHeader.addEventListener('click', () => {
+                const isHidden = cardBody.style.display === 'none';
+                cardBody.style.display = isHidden ? '' : 'none';
+                cardHeader.querySelector('.lookup-chevron').style.transform = isHidden ? '' : 'rotate(-90deg)';
+            });
+
+            container.appendChild(card);
+        });
     }
 
     return { render };
