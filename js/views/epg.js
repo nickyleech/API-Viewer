@@ -1471,7 +1471,7 @@ const EpgView = (() => {
             if (!epg && noRegionPlatforms.has(pIdx) && map['(No regions)']) {
                 epg = map['(No regions)'][chId];
             }
-            return epg || null;
+            return epg ? String(epg) : null;
         }
 
         const info = document.createElement('div');
