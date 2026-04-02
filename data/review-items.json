@@ -2,18 +2,6 @@
   "version": 1,
   "items": [
     {
-      "id": "56d7a1c3-b1b2-5557-af7a-6682ee97a213",
-      "title": "Cruise TV with LoveitBookit",
-      "note": "Nick thought the images for this were not impressive",
-      "channel": "5",
-      "channelId": "bbc2a081-fc85-5c05-8ff0-4438cc97de2c",
-      "dateTime": "2026-04-01T00:35:00.000Z",
-      "assetId": "27ca37ba-38d2-5354-8cbb-ab457bc966ce",
-      "source": "schedule",
-      "addedAt": "2026-04-01T20:27:42.797Z",
-      "checking": false
-    },
-    {
       "id": "3f7ae5fd-49fd-56d4-9625-e218f430ddea",
       "title": "Sounds of the 90s with Fearne Cotton",
       "note": "Image looks old",
