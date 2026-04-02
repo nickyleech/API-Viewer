@@ -2,18 +2,6 @@
   "version": 1,
   "items": [
     {
-      "id": "4dc9e401-2975-5795-a16d-ee1296484b10",
-      "title": "Entertainment News on 5",
-      "note": "A little note",
-      "channel": "5",
-      "channelId": "bbc2a081-fc85-5c05-8ff0-4438cc97de2c",
-      "dateTime": "2026-04-03T00:25:00.000Z",
-      "assetId": "67ddf285-a553-5902-a967-aa868a1ea206",
-      "source": "schedule",
-      "addedAt": "2026-04-02T09:04:50.268Z",
-      "checking": false
-    },
-    {
       "id": "56d7a1c3-b1b2-5557-af7a-6682ee97a213",
       "title": "Cruise TV with LoveitBookit",
       "note": "Nick thought the images for this were not impressive",
