@@ -59,6 +59,9 @@ const ImagesView = (() => {
             <div id="tab-audit" class="tab-panel active">
                 <div id="audit-config-summary" style="display:none"></div>
                 <div id="audit-config">
+                <div id="audit-config-collapse" style="display:none;margin-bottom:8px;text-align:right">
+                    <button id="audit-config-done" class="btn btn-sm btn-secondary">&larr; Back to Results</button>
+                </div>
                 <div class="filter-bar">
                     <div class="form-group" style="min-width:300px;max-width:400px">
                         <label>Channel</label>
@@ -797,6 +800,7 @@ function getDateRange() {
 
         // Wire up all event listeners first (synchronous, always succeeds)
         document.getElementById('audit-run').addEventListener('click', runAudit);
+        document.getElementById('audit-config-done').addEventListener('click', collapseAuditConfig);
         document.getElementById('audit-save-list').addEventListener('click', saveChannelList);
         document.getElementById('audit-update-list').addEventListener('click', updateChannelList);
         document.getElementById('audit-rename-list').addEventListener('click', renameChannelList);
@@ -1211,6 +1215,7 @@ function getDateRange() {
     function expandAuditConfig() {
         document.getElementById('audit-config').style.display = '';
         document.getElementById('audit-config-summary').style.display = 'none';
+        document.getElementById('audit-config-collapse').style.display = auditResults.length > 0 ? '' : 'none';
     }
 
     // --- Audit execution ---
