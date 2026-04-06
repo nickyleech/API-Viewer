@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PA TV API Viewer</title>
     <link rel="stylesheet" href="css/styles.css">
+    <script>
+        // Apply theme before first paint to prevent flash
+        (function() {
+            var pref = localStorage.getItem('pa_theme_preference') || 'system';
+            var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
 </head>
 <body>
     <header class="app-header">
@@ -53,6 +61,15 @@
                 <label class="modal-label" for="github-token-input">GitHub Token <span class="modal-optional">(optional)</span></label>
                 <p>Required to save channel lists to the shared repository. Without a token, you can only load existing lists. <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">Create a token</a></p>
                 <input type="text" id="github-token-input" class="input" placeholder="ghp_..." autocomplete="off">
+            </div>
+
+            <div class="modal-section">
+                <label class="modal-label" for="theme-select">Theme</label>
+                <select id="theme-select" class="input" style="min-width:auto">
+                    <option value="system">System default</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
             </div>
 
             <div class="modal-actions">

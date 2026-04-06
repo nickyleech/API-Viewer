@@ -12,6 +12,7 @@ const App = (() => {
     let currentView = null;
 
     function init() {
+        applyTheme();
         setupApiKeyModal();
         setupNavigation();
 
@@ -82,6 +83,11 @@ const App = (() => {
             const ghToken = document.getElementById('github-token-input').value.trim();
             GitHubStorage.setToken(ghToken);
 
+            // Save theme preference
+            const theme = document.getElementById('theme-select').value;
+            localStorage.setItem('pa_theme_preference', theme);
+            applyTheme();
+
             closeApiKeyModal();
             updateKeyStatus();
             API.toast('Settings saved.', 'success');
@@ -114,6 +120,7 @@ const App = (() => {
         _modalTrigger = document.activeElement;
         input.value = API.getApiKey();
         ghInput.value = GitHubStorage.getToken();
+        document.getElementById('theme-select').value = localStorage.getItem('pa_theme_preference') || 'system';
         cancelBtn.style.display = firstTime && !API.hasApiKey() ? 'none' : '';
         modal.classList.add('open');
         setTimeout(() => input.focus(), 100);
@@ -149,6 +156,29 @@ const App = (() => {
             first.focus();
         }
     }
+
+    function applyTheme() {
+        const pref = localStorage.getItem('pa_theme_preference') || 'system';
+        if (pref === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else if (pref === 'light') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        }
+    }
+
+    // Listen for system theme changes (registered once)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if ((localStorage.getItem('pa_theme_preference') || 'system') === 'system') {
+            applyTheme();
+        }
+    });
 
     function updateKeyStatus() {
         const el = document.getElementById('api-key-status');
