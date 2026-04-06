@@ -82,7 +82,7 @@ const App = (() => {
             const ghToken = document.getElementById('github-token-input').value.trim();
             GitHubStorage.setToken(ghToken);
 
-            modal.classList.remove('open');
+            closeApiKeyModal();
             updateKeyStatus();
             API.toast('Settings saved.', 'success');
             // Reload current view
@@ -91,27 +91,63 @@ const App = (() => {
 
         cancelBtn.addEventListener('click', () => {
             if (API.hasApiKey()) {
-                modal.classList.remove('open');
+                closeApiKeyModal();
             } else {
                 API.toast('An API key is required to use this tool.', 'warning');
             }
         });
+
+        document.addEventListener('keydown', trapFocus);
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') saveBtn.click();
         });
     }
 
+    let _modalTrigger = null;
+
     function openApiKeyModal(firstTime) {
         const modal = document.getElementById('api-key-modal');
         const input = document.getElementById('api-key-input');
         const ghInput = document.getElementById('github-token-input');
         const cancelBtn = document.getElementById('api-key-cancel');
+        _modalTrigger = document.activeElement;
         input.value = API.getApiKey();
         ghInput.value = GitHubStorage.getToken();
         cancelBtn.style.display = firstTime && !API.hasApiKey() ? 'none' : '';
         modal.classList.add('open');
         setTimeout(() => input.focus(), 100);
+    }
+
+    function closeApiKeyModal() {
+        const modal = document.getElementById('api-key-modal');
+        modal.classList.remove('open');
+        if (_modalTrigger && _modalTrigger.focus) {
+            _modalTrigger.focus();
+            _modalTrigger = null;
+        }
+    }
+
+    function trapFocus(e) {
+        const modal = document.getElementById('api-key-modal');
+        if (!modal.classList.contains('open')) return;
+        if (e.key === 'Escape') {
+            if (API.hasApiKey()) closeApiKeyModal();
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        const focusable = modal.querySelectorAll('input, button, a, [tabindex]:not([tabindex="-1"])');
+        const visible = Array.from(focusable).filter(el => el.offsetParent !== null);
+        if (visible.length === 0) return;
+        const first = visible[0];
+        const last = visible[visible.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
     }
 
     function updateKeyStatus() {

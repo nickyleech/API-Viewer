@@ -130,7 +130,7 @@ const EpgView = (() => {
         document.getElementById('epg-platform').addEventListener('change', onPlatformChange);
         document.getElementById('epg-region').addEventListener('change', fetchEpg);
         document.getElementById('epg-fetch').addEventListener('click', fetchEpg);
-        document.getElementById('epg-search').addEventListener('input', filterBySearch);
+        document.getElementById('epg-search').addEventListener('input', API.debounce(filterBySearch, 200));
 
         // Variations tab
         document.getElementById('var-load').addEventListener('click', loadVariationsForPlatform);
@@ -215,7 +215,8 @@ const EpgView = (() => {
 
         API.showLoading(results);
         try {
-            const data = await API.fetch('/channel', params);
+            const signal = API.cancelable('epg');
+            const data = await API.fetch('/channel', params, { signal });
             const allItems = data.item || [];
             const hasRegions = regions.length > 0;
             epgChannels = hasRegions
@@ -232,6 +233,7 @@ const EpgView = (() => {
 
             renderEpgTable(results, filteredChannels, data);
         } catch (err) {
+            if (err.name === 'AbortError') return;
             epgChannels = [];
             filteredChannels = [];
             API.showError(results, err.message);
@@ -1121,69 +1123,17 @@ const EpgView = (() => {
     }
 
     function setupLookupChannelSearch() {
-        const input = document.getElementById('lookup-channel-search');
-        const dropdown = document.getElementById('lookup-channel-dropdown');
-
-        input.addEventListener('focus', () => { input.select(); });
-        input.addEventListener('input', showLookupDropdown);
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#lookup-channel-search') && !e.target.closest('#lookup-channel-dropdown')) {
-                dropdown.style.display = 'none';
-            }
-        });
-    }
-
-    function showLookupDropdown() {
-        const input = document.getElementById('lookup-channel-search');
-        const dropdown = document.getElementById('lookup-channel-dropdown');
-        const query = (input.value || '').toLowerCase().trim();
-
-        if (lookupAllChannels.length === 0) {
-            dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
-            dropdown.style.display = 'block';
-            return;
-        }
-
-        if (!query) {
-            dropdown.style.display = 'none';
-            return;
-        }
-
-        const selectedIds = new Set(lookupSelectedChannels.map(ch => ch.id));
-        const filtered = lookupAllChannels.filter(ch =>
-            !selectedIds.has(ch.id) && (ch.title || '').toLowerCase().includes(query)
-        );
-
-        if (filtered.length === 0) {
-            dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
-            dropdown.style.display = 'block';
-            return;
-        }
-
-        dropdown.innerHTML = '';
-        filtered.slice(0, 50).forEach(ch => {
-            const item = document.createElement('div');
-            item.className = 'dropdown-item';
-            item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
-            item.addEventListener('click', () => {
+        const selectedIds = () => new Set(lookupSelectedChannels.map(ch => ch.id));
+        ChannelDropdown.init({
+            inputId: 'lookup-channel-search',
+            dropdownId: 'lookup-channel-dropdown',
+            getChannels: () => lookupAllChannels,
+            filterFn: (ch) => !selectedIds().has(ch.id),
+            onSelect: (ch) => {
                 lookupSelectedChannels.push({ id: ch.id, title: ch.title });
                 renderLookupChips();
-                input.value = '';
-                dropdown.style.display = 'none';
-                input.focus();
-            });
-            dropdown.appendChild(item);
+            }
         });
-
-        if (filtered.length > 50) {
-            const more = document.createElement('div');
-            more.className = 'dropdown-empty';
-            more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
-            dropdown.appendChild(more);
-        }
-
-        dropdown.style.display = 'block';
     }
 
     function renderLookupChips() {
@@ -1278,13 +1228,17 @@ const EpgView = (() => {
         lookupSelectedChannels.forEach(ch => { channelTitleMap[ch.id] = ch.title; });
 
         API.showLoading(results);
+        const lookupSignal = API.cancelable('lookup');
+
+        try {
 
         // Step 1: Fetch full channel details for all selected channels
         const channelInfos = {};
         const detailPromises = lookupSelectedChannels.map(async (ch) => {
             try {
-                channelInfos[ch.id] = await API.fetch(`/channel/${ch.id}`);
+                channelInfos[ch.id] = await API.fetch(`/channel/${ch.id}`, {}, { signal: lookupSignal });
             } catch (err) {
+                if (err.name === 'AbortError') throw err;
                 channelInfos[ch.id] = { id: ch.id, title: ch.title };
             }
         });
@@ -1292,13 +1246,8 @@ const EpgView = (() => {
 
         // Step 2: Ensure platforms are loaded
         if (platforms.length === 0) {
-            try {
-                const data = await API.fetch('/platform');
-                platforms = data.item || [];
-            } catch (err) {
-                API.showError(results, 'Failed to load platforms.');
-                return;
-            }
+            const data = await API.fetch('/platform', {}, { signal: lookupSignal });
+            platforms = data.item || [];
         }
 
         // Step 3: Scan all platforms for any selected channel
@@ -1310,15 +1259,18 @@ const EpgView = (() => {
         `;
 
         for (let i = 0; i < platforms.length; i += batchSize) {
+            if (lookupSignal.aborted) return;
             const batch = platforms.slice(i, i + batchSize);
             const promises = batch.map(async (p) => {
                 try {
-                    const data = await API.fetch('/channel', { platformId: p.id });
+                    const data = await API.fetch('/channel', { platformId: p.id }, { signal: lookupSignal });
                     const channels = data.item || [];
                     if (channels.some(ch => selectedIds.has(ch.id))) {
                         return { platform: p, found: true };
                     }
-                } catch (err) { /* skip */ }
+                } catch (err) {
+                    if (err.name === 'AbortError') throw err;
+                }
                 return { platform: p, found: false };
             });
             const batchResults = await Promise.all(promises);
@@ -1343,35 +1295,41 @@ const EpgView = (() => {
         const platformEpgData = [];
 
         for (let i = 0; i < platformResults.length; i++) {
+            if (lookupSignal.aborted) return;
             const p = platformResults[i];
             const spinner = results.querySelector('.spinner');
             if (spinner) spinner.textContent = `Loading EPG data for ${p.title}... ${i + 1} / ${platformResults.length} platform(s)`;
 
             let pRegions = [];
             try {
-                const data = await API.fetch(`/platform/${p.id}/region`);
+                const data = await API.fetch(`/platform/${p.id}/region`, {}, { signal: lookupSignal });
                 pRegions = data.item || data || [];
-            } catch (err) { /* no regions */ }
+            } catch (err) {
+                if (err.name === 'AbortError') throw err;
+            }
 
             // regionEpgs entries now include channelId and channelTitle
             const regionEpgs = [];
 
             if (pRegions.length === 0) {
                 try {
-                    const data = await API.fetch('/channel', { platformId: p.id });
+                    const data = await API.fetch('/channel', { platformId: p.id }, { signal: lookupSignal });
                     (data.item || []).forEach(ch => {
                         if (selectedIds.has(ch.id) && ch.epg) {
                             regionEpgs.push({ region: '(No regions)', channelId: ch.id, channelTitle: channelTitleMap[ch.id], epg: ch.epg });
                         }
                     });
-                } catch (err) { /* skip */ }
+                } catch (err) {
+                    if (err.name === 'AbortError') throw err;
+                }
             } else {
                 for (let j = 0; j < pRegions.length; j += batchSize) {
+                    if (lookupSignal.aborted) return;
                     const rBatch = pRegions.slice(j, j + batchSize);
                     const rPromises = rBatch.map(async (r) => {
                         const rName = r.title || r.name || 'Unnamed';
                         try {
-                            const data = await API.fetch('/channel', { platformId: p.id, regionId: r.id });
+                            const data = await API.fetch('/channel', { platformId: p.id, regionId: r.id }, { signal: lookupSignal });
                             const matches = [];
                             (data.item || []).forEach(ch => {
                                 if (selectedIds.has(ch.id) && ch.epg) {
@@ -1379,7 +1337,9 @@ const EpgView = (() => {
                                 }
                             });
                             return matches;
-                        } catch (err) { /* skip */ }
+                        } catch (err) {
+                            if (err.name === 'AbortError') throw err;
+                        }
                         return [];
                     });
                     const rResults = await Promise.all(rPromises);
@@ -1394,6 +1354,11 @@ const EpgView = (() => {
 
         // Step 5: Render results
         renderLookupResults(results, channelInfos, platformEpgData);
+
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            API.showError(results, err.message);
+        }
     }
 
     function renderLookupChannelHeader(container, channelInfos) {

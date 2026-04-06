@@ -13,7 +13,7 @@
         </div>
         <div class="header-right">
             <span id="api-key-status" class="key-status"></span>
-            <button id="api-key-btn" class="btn btn-header">Settings</button>
+            <button id="api-key-btn" class="btn btn-header" aria-label="Open settings">Settings</button>
         </div>
     </header>
 
@@ -39,18 +39,18 @@
     </div>
 
     <!-- Settings Modal -->
-    <div id="api-key-modal" class="modal-overlay">
+    <div id="api-key-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="modal">
-            <h2>Settings</h2>
+            <h2 id="modal-title">Settings</h2>
 
             <div class="modal-section">
-                <label class="modal-label">PA API Key</label>
+                <label class="modal-label" for="api-key-input">PA API Key</label>
                 <p>Your key is stored locally in your browser and sent directly to the PA TV API. It is never shared with any third party.</p>
                 <input type="text" id="api-key-input" class="input" placeholder="Your PA API key" autocomplete="off">
             </div>
 
             <div class="modal-section">
-                <label class="modal-label">GitHub Token <span class="modal-optional">(optional)</span></label>
+                <label class="modal-label" for="github-token-input">GitHub Token <span class="modal-optional">(optional)</span></label>
                 <p>Required to save channel lists to the shared repository. Without a token, you can only load existing lists. <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">Create a token</a></p>
                 <input type="text" id="github-token-input" class="input" placeholder="ghp_..." autocomplete="off">
             </div>
@@ -63,19 +63,21 @@
     </div>
 
     <!-- Toast container -->
-    <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script src="js/api.js?v=2"></script>
-    <script src="js/review-store.js?v=2"></script>
-    <script src="js/github-storage.js?v=2"></script>
-    <script src="js/views/platforms.js?v=2"></script>
-    <script src="js/views/channels.js?v=2"></script>
-    <script src="js/views/epg.js?v=2"></script>
-    <script src="js/views/schedule.js?v=2"></script>
-    <script src="js/views/images.js?v=2"></script>
-    <script src="js/views/logos.js?v=2"></script>
-    <script src="js/views/review.js?v=2"></script>
-    <script src="js/app.js?v=2"></script>
+    <script src="js/api.js?v=3"></script>
+    <script src="js/review-store.js?v=3"></script>
+    <script src="js/github-storage.js?v=3"></script>
+    <script src="js/components/channel-dropdown.js?v=3"></script>
+    <script src="js/components/programme-detail.js?v=3"></script>
+    <script src="js/views/platforms.js?v=3"></script>
+    <script src="js/views/channels.js?v=3"></script>
+    <script src="js/views/epg.js?v=3"></script>
+    <script src="js/views/schedule.js?v=3"></script>
+    <script src="js/views/images.js?v=3"></script>
+    <script src="js/views/logos.js?v=3"></script>
+    <script src="js/views/review.js?v=3"></script>
+    <script src="js/app.js?v=3"></script>
 </body>
 </html>

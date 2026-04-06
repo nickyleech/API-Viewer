@@ -46,64 +46,13 @@ const LogosView = (() => {
     }
 
     function setupChannelSearch() {
-        const input = document.getElementById('logo-channel-search');
-        const dropdown = document.getElementById('logo-channel-dropdown');
-        const hiddenId = document.getElementById('logo-channel-id');
-
-        input.addEventListener('focus', () => input.select());
-        input.addEventListener('input', () => showDropdown());
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#logo-channel-search') && !e.target.closest('#logo-channel-dropdown')) {
-                dropdown.style.display = 'none';
-            }
+        ChannelDropdown.init({
+            inputId: 'logo-channel-search',
+            dropdownId: 'logo-channel-dropdown',
+            hiddenId: 'logo-channel-id',
+            getChannels: () => allChannels,
+            onSelect: (ch) => loadSingleChannel(ch.id)
         });
-
-        function showDropdown() {
-            const query = (input.value || '').toLowerCase().trim();
-
-            if (allChannels.length === 0) {
-                dropdown.innerHTML = '<div class="dropdown-empty">Loading channels...</div>';
-                dropdown.style.display = 'block';
-                return;
-            }
-
-            if (!query) {
-                dropdown.style.display = 'none';
-                return;
-            }
-
-            const filtered = allChannels.filter(ch => (ch.title || '').toLowerCase().includes(query));
-
-            if (filtered.length === 0) {
-                dropdown.innerHTML = '<div class="dropdown-empty">No channels found</div>';
-                dropdown.style.display = 'block';
-                return;
-            }
-
-            dropdown.innerHTML = '';
-            filtered.slice(0, 50).forEach(ch => {
-                const item = document.createElement('div');
-                item.className = 'dropdown-item';
-                item.innerHTML = `<strong>${API.escapeHtml(ch.title)}</strong><span class="dropdown-id">${API.escapeHtml(ch.id)}</span>`;
-                item.addEventListener('click', () => {
-                    input.value = ch.title;
-                    hiddenId.value = ch.id;
-                    dropdown.style.display = 'none';
-                    loadSingleChannel(ch.id);
-                });
-                dropdown.appendChild(item);
-            });
-
-            if (filtered.length > 50) {
-                const more = document.createElement('div');
-                more.className = 'dropdown-empty';
-                more.textContent = `${filtered.length - 50} more \u2014 keep typing to narrow results`;
-                dropdown.appendChild(more);
-            }
-
-            dropdown.style.display = 'block';
-        }
     }
 
     async function loadSingleChannel(channelId) {
@@ -140,23 +89,37 @@ const LogosView = (() => {
         results.appendChild(progressWrap);
 
         channelDetails = [];
+        const failed = [];
+        const signal = API.cancelable('logos');
         const batchSize = 5;
-        for (let i = 0; i < allChannels.length; i += batchSize) {
-            const batch = allChannels.slice(i, i + batchSize);
-            const details = await Promise.all(
-                batch.map(ch => API.fetch(`/channel/${ch.id}`).catch(() => null))
-            );
-            details.forEach(d => { if (d) channelDetails.push(d); });
+        try {
+            for (let i = 0; i < allChannels.length; i += batchSize) {
+                if (signal.aborted) return;
+                const batch = allChannels.slice(i, i + batchSize);
+                const details = await Promise.all(
+                    batch.map(ch => API.fetch(`/channel/${ch.id}`, {}, { signal }).catch(() => {
+                        failed.push(ch.title || ch.id);
+                        return null;
+                    }))
+                );
+                details.forEach(d => { if (d) channelDetails.push(d); });
 
-            const done = Math.min(i + batchSize, allChannels.length);
-            const pText = document.getElementById('logo-progress-text');
-            const pBar = document.getElementById('logo-progress-bar');
-            if (pText) pText.textContent = `${done} / ${allChannels.length}`;
-            if (pBar) pBar.style.width = `${(done / allChannels.length) * 100}%`;
+                const done = Math.min(i + batchSize, allChannels.length);
+                const pText = document.getElementById('logo-progress-text');
+                const pBar = document.getElementById('logo-progress-bar');
+                if (pText) pText.textContent = `${done} / ${allChannels.length}`;
+                if (pBar) pBar.style.width = `${(done / allChannels.length) * 100}%`;
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            throw err;
         }
 
         channelDetails.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
         renderLogos(results, channelDetails);
+        if (failed.length > 0) {
+            API.toast(`Failed to load ${failed.length} channel(s): ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? '...' : ''}`, 'warning');
+        }
     }
 
     function renderLogos(container, channels) {

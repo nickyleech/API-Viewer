@@ -75,13 +75,13 @@ const ReviewStore = (() => {
     function add(reviewItem) {
         if (_items === null) _items = _loadLocal();
         _items.unshift(reviewItem);
-        _persist('Add review item: ' + (reviewItem.title || 'Untitled'));
+        _persist('Add review item: ' + (reviewItem.title || 'Untitled')).catch(() => {});
     }
 
     function remove(id) {
         if (_items === null) _items = _loadLocal();
         _items = _items.filter(item => item.id !== id);
-        _persist('Remove review item');
+        _persist('Remove review item').catch(() => {});
     }
 
     function toggleChecking(id) {
@@ -89,7 +89,7 @@ const ReviewStore = (() => {
         const item = _items.find(i => i.id === id);
         if (item) {
             item.checking = !item.checking;
-            _persist('Toggle review item status');
+            _persist('Toggle review item status').catch(() => {});
         }
         return item;
     }

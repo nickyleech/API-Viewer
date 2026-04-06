@@ -37,7 +37,7 @@ const ChannelsView = (() => {
         await loadPlatforms();
         document.getElementById('ch-platform').addEventListener('change', onPlatformChange);
         document.getElementById('ch-fetch').addEventListener('click', fetchChannels);
-        document.getElementById('ch-search-input').addEventListener('input', filterChannels);
+        document.getElementById('ch-search-input').addEventListener('input', API.debounce(filterChannels, 200));
 
         // Auto-load all channels on render
         await fetchChannels();

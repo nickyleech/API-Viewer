@@ -17,7 +17,7 @@ const API = (() => {
         return !!getApiKey();
     }
 
-    async function apiFetch(path, params = {}) {
+    async function apiFetch(path, params = {}, opts = {}) {
         const key = getApiKey();
         if (!key) {
             throw new ApiError('No API key configured. Please set your API key.', 401);
@@ -28,12 +28,14 @@ const API = (() => {
         const qs = filtered.length ? '?' + new URLSearchParams(filtered).toString() : '';
         const url = `${BASE_URL}${path}${qs}`;
 
+        const fetchOpts = { headers: { 'apikey': key } };
+        if (opts.signal) fetchOpts.signal = opts.signal;
+
         let response;
         try {
-            response = await fetch(url, {
-                headers: { 'apikey': key }
-            });
+            response = await fetch(url, fetchOpts);
         } catch (err) {
+            if (err.name === 'AbortError') throw err;
             throw new ApiError('Network error. Please check your connection.', 0);
         }
 
@@ -49,6 +51,33 @@ const API = (() => {
 
         const data = await response.json();
         return data;
+    }
+
+    // AbortController helper: cancels any previous request for the same key
+    const _controllers = {};
+    function cancelable(key) {
+        if (_controllers[key]) _controllers[key].abort();
+        _controllers[key] = new AbortController();
+        return _controllers[key].signal;
+    }
+
+    // Debounce utility
+    function debounce(fn, ms) {
+        let timer;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), ms);
+        };
+    }
+
+    // Smooth scroll that respects prefers-reduced-motion
+    function smoothScroll(el, options = {}) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({
+            block: 'start',
+            ...options,
+            behavior: prefersReducedMotion ? 'auto' : 'smooth'
+        });
     }
 
     class ApiError extends Error {
@@ -152,11 +181,13 @@ const API = (() => {
         return images;
     }
 
-    // Toast notification
+    // Toast notification (accessible)
     function toast(message, type = 'error') {
         const container = document.getElementById('toast-container');
         const el = document.createElement('div');
         el.className = `toast ${type}`;
+        el.setAttribute('role', 'alert');
+        el.setAttribute('aria-live', 'assertive');
         el.textContent = message;
         container.appendChild(el);
         setTimeout(() => el.remove(), 3000);
@@ -164,7 +195,7 @@ const API = (() => {
 
     return {
         getApiKey, setApiKey, removeApiKey, hasApiKey,
-        fetch: apiFetch,
+        fetch: apiFetch, cancelable, debounce, smoothScroll,
         jsonToggle, showLoading, showError, showEmpty,
         escapeHtml, toast, extractImages, ApiError
     };
