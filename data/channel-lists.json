@@ -58,6 +58,10 @@
           "title": "Channel 4"
         }
       ]
+    },
+    {
+      "name": "A Channels",
+      "channels": []
     }
   ]
 }
