@@ -61,7 +61,192 @@
     },
     {
       "name": "A Channels",
-      "channels": []
+      "channels": [
+        {
+          "id": "3d8bb828-1eb5-5de5-bb40-efba8bae9835",
+          "title": "4seven"
+        },
+        {
+          "id": "bbc2a081-fc85-5c05-8ff0-4438cc97de2c",
+          "title": "5"
+        },
+        {
+          "id": "022ec304-25b9-5b07-aaf1-c90a0393abce",
+          "title": "5Action"
+        },
+        {
+          "id": "f3a9b277-2bf1-5755-a8ea-7912e8063b01",
+          "title": "5SELECT"
+        },
+        {
+          "id": "9512892c-d864-513c-b630-abb5df6b49f4",
+          "title": "5STAR"
+        },
+        {
+          "id": "4b75d2ae-672b-5d6f-b1d8-a0b2761fde3a",
+          "title": "5USA"
+        },
+        {
+          "id": "a4f95c8d-ec00-52bc-8b54-dcc6914a0884",
+          "title": "Animal Planet"
+        },
+        {
+          "id": "f2fb2e91-2578-5975-a7cc-dd048186ea52",
+          "title": "BBC Four"
+        },
+        {
+          "id": "0e5222b1-5665-5d26-855e-6a81768dcfa1",
+          "title": "BBC News"
+        },
+        {
+          "id": "2a548fcc-55e9-561d-9a77-f485fb69dad1",
+          "title": "BBC One London"
+        },
+        {
+          "id": "02c72929-e949-5e13-82be-2c3710674cff",
+          "title": "BBC One Northern Ireland"
+        },
+        {
+          "id": "4934e0e3-cb93-5eea-825c-fb3cf94e492f",
+          "title": "BBC One Scotland"
+        },
+        {
+          "id": "b0a35b8b-2efd-52cd-9395-5d8686bbbd8a",
+          "title": "BBC One Wales"
+        },
+        {
+          "id": "90230fa8-b213-5bda-b8ac-0ea968795c73",
+          "title": "BBC Red Button 1"
+        },
+        {
+          "id": "fea6e9fd-c98c-5209-849f-a486ac600ff7",
+          "title": "BBC Three"
+        },
+        {
+          "id": "0b6789ff-d68b-5b85-8412-8f11d5e22e10",
+          "title": "BBC Two England"
+        },
+        {
+          "id": "245470c0-ad75-54be-95ed-ecdb9085c849",
+          "title": "BBC Two Northern Ireland"
+        },
+        {
+          "id": "d634b06d-7ce2-5cad-b949-2a268da4bd5e",
+          "title": "BBC Two Wales"
+        },
+        {
+          "id": "0813713e-ca6c-5309-a36d-852e769462c6",
+          "title": "Blaze"
+        },
+        {
+          "id": "9b7f3740-1e34-5049-aa64-4726fccf7cc4",
+          "title": "Boomerang"
+        },
+        {
+          "id": "1f6ecdb4-985e-5ab3-adfc-022a5f63c6d1",
+          "title": "CBBC"
+        },
+        {
+          "id": "27b85aec-51fc-5c55-a483-24ff7c70186b",
+          "title": "CBeebies"
+        },
+        {
+          "id": "c9690e37-0878-566a-98a4-a8522ae8870d",
+          "title": "Cartoon Network"
+        },
+        {
+          "id": "fd66055a-5bc7-51e8-8421-df88e60c98b3",
+          "title": "Channel 4"
+        },
+        {
+          "id": "b13e2396-4327-569c-8e7a-18cead510f39",
+          "title": "Comedy Central"
+        },
+        {
+          "id": "feb61960-12f0-5643-a83e-03a30bf22baf",
+          "title": "Comedy Central Extra"
+        },
+        {
+          "id": "1b729d19-5b8b-5e9f-98a9-0efdd9bfc22c",
+          "title": "Crime + Investigation"
+        },
+        {
+          "id": "9bb6a4bf-ecfb-53f9-b495-6b12575dbdb7",
+          "title": "DMAX"
+        },
+        {
+          "id": "3d70e024-4435-5cec-b070-84ff71a8581e",
+          "title": "Discovery Channel"
+        },
+        {
+          "id": "84331c37-ef13-540e-97b8-f6d04171761f",
+          "title": "Discovery History"
+        },
+        {
+          "id": "9b0cda01-050d-52b2-afb7-dac498b63066",
+          "title": "Discovery Science"
+        },
+        {
+          "id": "2afa5a8f-dcfa-5cf4-a063-f5dfc10a9846",
+          "title": "Discovery Turbo"
+        },
+        {
+          "id": "b5442f3a-c482-50d1-96d5-f25fd16f3e37",
+          "title": "E4"
+        },
+        {
+          "id": "51b4a470-009c-5a13-bb8d-1f1090796c3c",
+          "title": "Film4"
+        },
+        {
+          "id": "2109be88-a3e5-5b9a-a58d-9e6008036fb7",
+          "title": "Food Network"
+        },
+        {
+          "id": "887b5cf2-34b3-52d3-ad41-3abe278d6977",
+          "title": "Great! Action"
+        },
+        {
+          "id": "090bad0a-74be-5cd9-a5be-881ac8161789",
+          "title": "Great! Mystery"
+        },
+        {
+          "id": "5815be9a-a1b7-5e1c-9d78-4e8b66adb0ed",
+          "title": "Great! Romance"
+        },
+        {
+          "id": "a4338e0a-ccc0-5a01-a6aa-f8ece805bb75",
+          "title": "Great! TV"
+        },
+        {
+          "id": "a7b21ed3-4835-5065-8824-cc04de2e5733",
+          "title": "ITV Quiz"
+        },
+        {
+          "id": "f0eac74d-2245-57c9-9dfa-d8a54da0c066",
+          "title": "ITV1 London"
+        },
+        {
+          "id": "dc32d68c-33d3-5313-b5e9-e8efea7f1d5f",
+          "title": "ITV1 Wales"
+        },
+        {
+          "id": "64b0d836-b2b1-5a9c-a077-99fbd5dff799",
+          "title": "ITV2"
+        },
+        {
+          "id": "8dc66a04-043a-5c8e-aab3-a32343bd2016",
+          "title": "ITV3"
+        },
+        {
+          "id": "76c14546-b2bd-51d4-9760-4b24820686e2",
+          "title": "ITV4"
+        },
+        {
+          "id": "1d374c86-0414-5d5e-9fd3-eaef8a14da9b",
+          "title": "Investigation Discovery"
+        }
+      ]
     }
   ]
 }
