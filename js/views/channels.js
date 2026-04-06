@@ -128,13 +128,21 @@ const ChannelsView = (() => {
         info.textContent = `Showing ${items.length} of ${allChannels.length} channel(s)`;
         infoBar.appendChild(info);
 
+        container.appendChild(infoBar);
+
+        // Download Excel button (will be placed in jsonToggle group or standalone)
         const dlBtn = document.createElement('button');
         dlBtn.className = 'btn btn-sm btn-secondary';
         dlBtn.textContent = 'Download Excel (TV / Radio)';
         dlBtn.addEventListener('click', () => downloadChannelsExcel(items));
-        infoBar.appendChild(dlBtn);
 
-        container.appendChild(infoBar);
+        if (rawData) {
+            const toggle = API.jsonToggle(rawData);
+            toggle.querySelector('.json-toggle-buttons').appendChild(dlBtn);
+            container.firstElementChild.after(toggle);
+        } else {
+            infoBar.appendChild(dlBtn);
+        }
 
         const table = document.createElement('table');
         table.className = 'data-table';
@@ -185,10 +193,6 @@ const ChannelsView = (() => {
                 setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
             });
         });
-
-        if (rawData) {
-            container.firstElementChild.after(API.jsonToggle(rawData));
-        }
     }
 
     function downloadChannelsExcel(channels) {
