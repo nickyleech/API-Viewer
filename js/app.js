@@ -6,7 +6,8 @@ const App = (() => {
         schedule: ScheduleView,
         images: ImagesView,
         logos: LogosView,
-        review: ReviewView
+        review: ReviewView,
+        instructions: InstructionsView
     };
 
     let currentView = null;
