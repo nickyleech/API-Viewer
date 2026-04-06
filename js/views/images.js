@@ -57,6 +57,8 @@ const ImagesView = (() => {
             </div>
 
             <div id="tab-audit" class="tab-panel active">
+                <div id="audit-config-summary" style="display:none"></div>
+                <div id="audit-config">
                 <div class="filter-bar">
                     <div class="form-group" style="min-width:300px;max-width:400px">
                         <label>Channel</label>
@@ -132,6 +134,7 @@ const ImagesView = (() => {
                         <label>&nbsp;</label>
                         <button id="audit-run" class="btn btn-primary">Run Audit</button>
                     </div>
+                </div>
                 </div>
                 <div id="audit-progress" style="display:none"></div>
                 <div id="audit-results"></div>
@@ -804,6 +807,7 @@ function getDateRange() {
             auditResults = [];
             renderSelectedChips();
             document.getElementById('audit-results').innerHTML = '';
+            expandAuditConfig();
         });
 
         // TV/Radio filter checkboxes
@@ -1183,6 +1187,32 @@ function getDateRange() {
         }
     }
 
+    // --- Config collapse/expand ---
+
+    function collapseAuditConfig() {
+        const config = document.getElementById('audit-config');
+        const summary = document.getElementById('audit-config-summary');
+        config.style.display = 'none';
+
+        const channelCount = auditSelectedChannels.length;
+        const startDate = document.getElementById('audit-start').value;
+        const days = document.getElementById('audit-days').value;
+        const formattedDate = new Date(startDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        summary.style.display = '';
+        summary.style.cssText = 'margin-bottom:16px;padding:10px 16px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;display:flex;align-items:center;justify-content:space-between';
+        summary.innerHTML = `
+            <span style="font-size:13px;color:var(--color-text-secondary)">${channelCount} channel(s) &middot; ${formattedDate} &middot; ${days} day(s)</span>
+            <button class="btn btn-sm btn-secondary" id="audit-config-edit">Edit</button>
+        `;
+        document.getElementById('audit-config-edit').addEventListener('click', expandAuditConfig);
+    }
+
+    function expandAuditConfig() {
+        document.getElementById('audit-config').style.display = '';
+        document.getElementById('audit-config-summary').style.display = 'none';
+    }
+
     // --- Audit execution ---
 
     async function runAudit() {
@@ -1283,6 +1313,8 @@ function getDateRange() {
         auditInProgress = false;
         progressDiv.style.display = 'none';
         renderAuditResults();
+        collapseAuditConfig();
+        document.getElementById('audit-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // --- Audit results rendering ---
@@ -1351,11 +1383,14 @@ function getDateRange() {
             const withLabel = mode === 'any' ? 'with at least one image' : `with ${modeLabel.toLowerCase()} images`;
             summaryDiv.innerHTML = `${auditResults.length} channel(s) audited &mdash; ${totals.total} programmes, <strong style="color:var(--color-success)">${totals.with}</strong> ${withLabel} (${totalPct}%), <strong style="color:${totals.without > 0 ? 'var(--color-error)' : 'var(--color-success)'}">${totals.without}</strong> missing${excludedNote}`;
         }
-        container.appendChild(summaryDiv);
+        // Sticky header for summary + toolbar
+        const stickyHeader = document.createElement('div');
+        stickyHeader.style.cssText = 'position:sticky;top:0;z-index:10;background:var(--color-bg);padding:12px 0 4px;margin:0 0 8px';
+        stickyHeader.appendChild(summaryDiv);
 
         // Toolbar: view mode selector + action buttons in one row
         const toolbar = document.createElement('div');
-        toolbar.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap';
+        toolbar.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap';
 
         const modes = [
             { key: 'any', label: 'Any Image' },
@@ -1399,7 +1434,8 @@ function getDateRange() {
         exportBtn.textContent = 'Export to Excel';
         exportBtn.addEventListener('click', exportAuditExcel);
         toolbar.appendChild(exportBtn);
-        container.appendChild(toolbar);
+        stickyHeader.appendChild(toolbar);
+        container.appendChild(stickyHeader);
 
         // Results table
         const table = document.createElement('table');
