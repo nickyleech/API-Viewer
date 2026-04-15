@@ -400,7 +400,6 @@ function getDateRange() {
         const container = document.getElementById('content');
         const channelName = (externalOpts && externalOpts.channelName) || (document.getElementById('img-channel-search') || {}).value || '';
         const channelId = (externalOpts && externalOpts.channelId) || currentChannelId || '';
-        window.scrollTo(0, 0);
 
         if (externalOpts && externalOpts.onBack) {
             container.innerHTML = '';
@@ -436,6 +435,8 @@ function getDateRange() {
         panel.firstElementChild.after(API.jsonToggle(item, () => {
             ReviewStore.openReviewModal(item, channelName, 'images', channelId);
         }));
+
+        window.scrollTo(0, 0);
     }
 
     // ============================================================
