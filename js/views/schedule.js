@@ -168,6 +168,54 @@ const ScheduleView = (() => {
         unicodeBtn.addEventListener('click', () => checkUnicode(items));
         btnGroup.appendChild(unicodeBtn);
 
+        const infoWrap = document.createElement('span');
+        infoWrap.className = 'unicode-info-wrap';
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'unicode-info-btn';
+        infoBtn.textContent = '?';
+        infoBtn.title = 'What does Check Unicode look for?';
+        infoBtn.setAttribute('aria-label', 'What does Check Unicode look for?');
+        infoWrap.appendChild(infoBtn);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'unicode-info-dropdown';
+        dropdown.innerHTML = `
+            <h4>Unicode Errors (flagged as issues)</h4>
+            <ul>
+                <li><strong>Replacement character</strong> <code>U+FFFD</code> &mdash; indicates failed decoding</li>
+                <li><strong>Mojibake / double-encoded UTF-8</strong> &mdash; e.g. <code>\u00C3\u00A9</code> instead of <code>\u00E9</code></li>
+                <li><strong>Unresolved HTML entities</strong> &mdash; e.g. <code>&amp;amp;</code>, <code>&amp;#233;</code></li>
+                <li><strong>Invisible / zero-width characters</strong> &mdash; Non-Breaking Space <code>U+00A0</code>, Soft Hyphen <code>U+00AD</code>, Zero-Width Space/Joiner/Non-Joiner <code>U+200B\u2013D</code>, LTR/RTL marks <code>U+200E\u2013F</code>, Line/Paragraph separators <code>U+2028\u20139</code>, Bidi controls <code>U+202A\u2013E</code>, Word Joiner <code>U+2060</code>, Directional Isolates <code>U+2066\u20139</code>, BOM <code>U+FEFF</code></li>
+                <li><strong>C0/C1 control characters</strong> &mdash; <code>U+0000\u2013001F</code> and <code>U+007F\u20139F</code> (except tab, newline, carriage return)</li>
+                <li><strong>Private Use Area</strong> &mdash; <code>U+E000\u2013F8FF</code></li>
+            </ul>
+            <h4>Non-ASCII Summary (codepoint &gt; 127)</h4>
+            <ul>
+                <li>All non-ASCII characters are categorised by Unicode range</li>
+                <li>Shows count, unique characters, and affected programmes per range</li>
+                <li>Ranges include: Latin-1 Supplement, Latin Extended, Greek, Cyrillic, Arabic, Hebrew, CJK, Emoji, Arrows, Math Operators, Currency Symbols, Box Drawing, and 30+ more</li>
+            </ul>
+            <h4>Text Fields Checked</h4>
+            <ul>
+                <li>Title, Episode Title</li>
+                <li>Summaries (Short / Medium / Long) at programme and asset level</li>
+                <li>Contributor names and character names</li>
+                <li>Categories, Keywords, Locations</li>
+                <li>Mood, Themes, Soundtrack</li>
+            </ul>
+        `;
+        infoWrap.appendChild(dropdown);
+        btnGroup.appendChild(infoWrap);
+
+        infoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (!dropdown.isConnected) return;
+            if (!infoWrap.contains(e.target)) dropdown.classList.remove('open');
+        });
+
         if (channelId) {
             const channelInfo = document.createElement('span');
             channelInfo.style.cssText = 'font-size:12px;color:var(--color-text);margin-left:12px';
