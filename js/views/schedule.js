@@ -621,7 +621,6 @@ const ScheduleView = (() => {
             panel.appendChild(section);
         }
 
-        API.smoothScroll(panel);
     }
 
     function restoreListView() {
