@@ -52,13 +52,18 @@ const ProgrammeDetail = (() => {
             ${summary.long ? `<div class="detail-row"><div class="detail-label">Full Description</div><div class="detail-value">${API.escapeHtml(summary.long)}</div></div>` : ''}
         `;
 
-        // Helper to add a detail row (supports empty-field hiding)
+        // Helper to create a detail row (empty rows are collected, not appended)
+        const emptyRows = [];
         function addRow(label, valueHtml, hasData) {
             const row = document.createElement('div');
             row.className = 'detail-row';
-            if (!hasData) row.classList.add('empty-field');
             row.innerHTML = `<div class="detail-label">${API.escapeHtml(label)}</div><div class="detail-value">${hasData ? valueHtml : '<span style="color:var(--color-text-secondary);font-style:italic">\u2014</span>'}</div>`;
-            panel.appendChild(row);
+            if (hasData) {
+                panel.appendChild(row);
+            } else {
+                row.style.display = 'none';
+                emptyRows.push(row);
+            }
         }
 
         // VOD availability
@@ -184,18 +189,18 @@ const ProgrammeDetail = (() => {
             panel.appendChild(contSection);
         }
 
-        // Show empty fields toggle
-        const emptyFields = panel.querySelectorAll('.empty-field');
-        if (emptyFields.length > 0) {
-            emptyFields.forEach(el => el.style.display = 'none');
-
+        // Show empty fields toggle (placed after contributors)
+        if (emptyRows.length > 0) {
             const toggleRow = document.createElement('div');
             toggleRow.style.cssText = 'margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border)';
-            toggleRow.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--color-text-secondary)"><input type="checkbox" style="cursor:pointer" aria-label="Toggle empty fields"> Show empty fields (${emptyFields.length})</label>`;
-            toggleRow.querySelector('input').addEventListener('change', (e) => {
-                emptyFields.forEach(el => el.style.display = e.target.checked ? 'flex' : 'none');
-            });
+            toggleRow.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--color-text-secondary)"><input type="checkbox" style="cursor:pointer" aria-label="Toggle empty fields"> Show empty fields (${emptyRows.length})</label>`;
             panel.appendChild(toggleRow);
+
+            emptyRows.forEach(row => panel.appendChild(row));
+
+            toggleRow.querySelector('input').addEventListener('change', (e) => {
+                emptyRows.forEach(el => el.style.display = e.target.checked ? 'flex' : 'none');
+            });
         }
     }
 
