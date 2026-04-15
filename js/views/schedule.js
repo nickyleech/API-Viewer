@@ -371,13 +371,17 @@ const ScheduleView = (() => {
                     if (cp <= 127) continue;
                     const rangeName = getRangeName(cp);
                     if (!ranges[rangeName]) {
-                        ranges[rangeName] = { count: 0, uniqueChars: new Set(), programmes: new Set(), fields: new Set() };
+                        ranges[rangeName] = { count: 0, uniqueChars: new Set(), programmes: new Map() };
                     }
                     const r = ranges[rangeName];
                     r.count++;
                     r.uniqueChars.add(ch);
-                    r.programmes.add(progKey);
-                    r.fields.add(progKey + '|' + fieldName);
+                    if (!r.programmes.has(progKey)) {
+                        r.programmes.set(progKey, { time, title, chars: new Set(), fields: new Set() });
+                    }
+                    const prog = r.programmes.get(progKey);
+                    prog.chars.add(ch);
+                    prog.fields.add(fieldName);
                 }
             });
         });
@@ -542,9 +546,9 @@ const ScheduleView = (() => {
                     const more = chars.length > 30 ? ` +${chars.length - 30} more` : '';
 
                     const tr = document.createElement('tr');
-                    tr.style.cssText = 'border-bottom:1px solid var(--color-border)';
+                    tr.style.cssText = 'border-bottom:1px solid var(--color-border);cursor:pointer';
                     tr.innerHTML = `
-                        <td style="padding:6px 8px;font-weight:600">${API.escapeHtml(name)}</td>
+                        <td style="padding:6px 8px;font-weight:600"><span style="font-size:10px;margin-right:4px">&#9654;</span>${API.escapeHtml(name)}</td>
                         <td style="padding:6px 8px;text-align:right">${r.count.toLocaleString()}</td>
                         <td style="padding:6px 8px;text-align:right">${r.programmes.size}</td>
                         <td style="padding:6px 8px"></td>
@@ -561,6 +565,46 @@ const ScheduleView = (() => {
                         charCell.appendChild(moreSpan);
                     }
                     tbody.appendChild(tr);
+
+                    // Expandable programme detail row
+                    const detailTr = document.createElement('tr');
+                    detailTr.style.display = 'none';
+                    const detailTd = document.createElement('td');
+                    detailTd.colSpan = 4;
+                    detailTd.style.cssText = 'padding:4px 8px 12px 28px';
+
+                    const progs = [...r.programmes.values()].sort((a, b) => a.time.localeCompare(b.time));
+                    progs.forEach(prog => {
+                        const progDiv = document.createElement('div');
+                        progDiv.style.cssText = 'display:flex;gap:10px;align-items:baseline;padding:3px 0;font-size:12px';
+                        const timeSpan = document.createElement('span');
+                        timeSpan.style.cssText = 'font-weight:700;color:var(--color-accent);min-width:44px';
+                        timeSpan.textContent = prog.time;
+                        const titleSpan = document.createElement('span');
+                        titleSpan.style.fontWeight = '600';
+                        titleSpan.textContent = prog.title;
+                        const fieldSpan = document.createElement('span');
+                        fieldSpan.style.cssText = 'color:var(--color-text-secondary);font-size:11px';
+                        fieldSpan.textContent = [...prog.fields].join(', ');
+                        const charDisplay = document.createElement('span');
+                        charDisplay.style.cssText = 'font-family:"SF Mono",Monaco,Consolas,monospace;letter-spacing:1px;margin-left:auto';
+                        charDisplay.textContent = [...prog.chars].join(' ');
+                        progDiv.appendChild(timeSpan);
+                        progDiv.appendChild(titleSpan);
+                        progDiv.appendChild(fieldSpan);
+                        progDiv.appendChild(charDisplay);
+                        detailTd.appendChild(progDiv);
+                    });
+
+                    detailTr.appendChild(detailTd);
+                    tbody.appendChild(detailTr);
+
+                    const arrow = tr.querySelector('span');
+                    tr.addEventListener('click', () => {
+                        const open = detailTr.style.display !== 'none';
+                        detailTr.style.display = open ? 'none' : '';
+                        arrow.textContent = open ? '\u25B6' : '\u25BC';
+                    });
                 });
 
             table.appendChild(tbody);
