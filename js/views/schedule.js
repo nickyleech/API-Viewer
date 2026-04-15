@@ -4,8 +4,15 @@ const ScheduleView = (() => {
     let savedScrollY = 0;
     let currentChannelId = '';
 
+    function localDateStr(dt) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     async function render(container) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateStr(new Date());
         container.innerHTML = `
             <div class="view-header">
                 <h2>Schedule</h2>
@@ -68,7 +75,7 @@ const ScheduleView = (() => {
         const dateInput = document.getElementById('sch-date');
         const dt = new Date(dateInput.value);
         dt.setDate(dt.getDate() + offset);
-        dateInput.value = dt.toISOString().slice(0, 10);
+        dateInput.value = localDateStr(dt);
         if (document.getElementById('sch-channel-id').value) loadSchedule();
     }
 
@@ -93,7 +100,7 @@ const ScheduleView = (() => {
         const params = {
             channelId,
             start: `${date}T00:00:00`,
-            end: `${nextDay.toISOString().slice(0, 10)}T00:00:00`
+            end: `${localDateStr(nextDay)}T00:00:00`
         };
 
         API.showLoading(results);
