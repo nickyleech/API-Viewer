@@ -160,6 +160,14 @@ const ScheduleView = (() => {
         });
 
         const jsonToggle = API.jsonToggle(data);
+        const btnGroup = jsonToggle.querySelector('.json-toggle-buttons');
+
+        const unicodeBtn = document.createElement('button');
+        unicodeBtn.className = 'btn btn-sm btn-secondary';
+        unicodeBtn.textContent = 'Check Unicode';
+        unicodeBtn.addEventListener('click', () => checkUnicode(items));
+        btnGroup.appendChild(unicodeBtn);
+
         if (channelId) {
             const channelInfo = document.createElement('span');
             channelInfo.style.cssText = 'font-size:12px;color:var(--color-text);margin-left:12px';
@@ -171,14 +179,8 @@ const ScheduleView = (() => {
                     setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
                 });
             });
-            jsonToggle.querySelector('.json-toggle-buttons').appendChild(channelInfo);
+            btnGroup.appendChild(channelInfo);
         }
-
-        const unicodeBtn = document.createElement('button');
-        unicodeBtn.className = 'btn btn-sm btn-secondary';
-        unicodeBtn.textContent = 'Check Unicode';
-        unicodeBtn.addEventListener('click', () => checkUnicode(items));
-        jsonToggle.querySelector('.json-toggle-buttons').appendChild(unicodeBtn);
 
         container.firstElementChild.after(jsonToggle);
 
@@ -263,13 +265,28 @@ const ScheduleView = (() => {
 
         // Invisible / zero-width characters
         const invisibleNames = {
+            '\u00A0': 'Non-Breaking Space (U+00A0)',
+            '\u00AD': 'Soft Hyphen (U+00AD)',
             '\u200B': 'Zero-Width Space (U+200B)',
             '\u200C': 'Zero-Width Non-Joiner (U+200C)',
             '\u200D': 'Zero-Width Joiner (U+200D)',
+            '\u200E': 'Left-to-Right Mark (U+200E)',
+            '\u200F': 'Right-to-Left Mark (U+200F)',
+            '\u2028': 'Line Separator (U+2028)',
+            '\u2029': 'Paragraph Separator (U+2029)',
+            '\u202A': 'Left-to-Right Embedding (U+202A)',
+            '\u202B': 'Right-to-Left Embedding (U+202B)',
+            '\u202C': 'Pop Directional Formatting (U+202C)',
+            '\u202D': 'Left-to-Right Override (U+202D)',
+            '\u202E': 'Right-to-Left Override (U+202E)',
+            '\u2060': 'Word Joiner (U+2060)',
+            '\u2066': 'Left-to-Right Isolate (U+2066)',
+            '\u2067': 'Right-to-Left Isolate (U+2067)',
+            '\u2068': 'First Strong Isolate (U+2068)',
+            '\u2069': 'Pop Directional Isolate (U+2069)',
             '\uFEFF': 'Byte Order Mark (U+FEFF)',
-            '\u00AD': 'Soft Hyphen (U+00AD)',
         };
-        for (const m of text.matchAll(/[\u200B\u200C\u200D\uFEFF\u00AD]/g)) {
+        for (const m of text.matchAll(/[\u00A0\u00AD\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g)) {
             issues.push({ type: 'invisible', description: invisibleNames[m[0]] || 'Invisible character', index: m.index, length: 1, char: m[0] });
         }
 
@@ -288,6 +305,85 @@ const ScheduleView = (() => {
         return issues;
     }
 
+    const UNICODE_RANGES = [
+        [0x0080, 0x00FF, 'Latin-1 Supplement'],
+        [0x0100, 0x024F, 'Latin Extended'],
+        [0x0250, 0x02AF, 'IPA Extensions'],
+        [0x02B0, 0x036F, 'Modifiers & Combining'],
+        [0x0370, 0x03FF, 'Greek'],
+        [0x0400, 0x052F, 'Cyrillic'],
+        [0x0530, 0x058F, 'Armenian'],
+        [0x0590, 0x05FF, 'Hebrew'],
+        [0x0600, 0x06FF, 'Arabic'],
+        [0x0700, 0x074F, 'Syriac'],
+        [0x0900, 0x097F, 'Devanagari'],
+        [0x0980, 0x09FF, 'Bengali'],
+        [0x0A80, 0x0AFF, 'Gujarati'],
+        [0x0B80, 0x0BFF, 'Tamil'],
+        [0x0E00, 0x0E7F, 'Thai'],
+        [0x0E80, 0x0EFF, 'Lao'],
+        [0x1000, 0x109F, 'Myanmar'],
+        [0x10A0, 0x10FF, 'Georgian'],
+        [0x1100, 0x11FF, 'Hangul Jamo'],
+        [0x2000, 0x206F, 'General Punctuation'],
+        [0x2070, 0x209F, 'Super/Subscripts'],
+        [0x20A0, 0x20CF, 'Currency Symbols'],
+        [0x2100, 0x214F, 'Letterlike Symbols'],
+        [0x2150, 0x218F, 'Number Forms'],
+        [0x2190, 0x21FF, 'Arrows'],
+        [0x2200, 0x22FF, 'Math Operators'],
+        [0x2300, 0x23FF, 'Technical Symbols'],
+        [0x2500, 0x257F, 'Box Drawing'],
+        [0x2580, 0x259F, 'Block Elements'],
+        [0x25A0, 0x25FF, 'Geometric Shapes'],
+        [0x2600, 0x26FF, 'Misc Symbols'],
+        [0x2700, 0x27BF, 'Dingbats'],
+        [0x3000, 0x303F, 'CJK Symbols'],
+        [0x3040, 0x309F, 'Hiragana'],
+        [0x30A0, 0x30FF, 'Katakana'],
+        [0x4E00, 0x9FFF, 'CJK Ideographs'],
+        [0xAC00, 0xD7AF, 'Hangul Syllables'],
+        [0xFE00, 0xFE0F, 'Variation Selectors'],
+        [0xFF00, 0xFFEF, 'Halfwidth/Fullwidth'],
+        [0x1F300, 0x1F9FF, 'Emoji & Pictographs'],
+        [0x1FA00, 0x1FAFF, 'Extended Emoji'],
+    ];
+
+    function getRangeName(cp) {
+        for (const [lo, hi, name] of UNICODE_RANGES) {
+            if (cp >= lo && cp <= hi) return name;
+        }
+        return 'Other (U+' + cp.toString(16).toUpperCase().padStart(4, '0') + ')';
+    }
+
+    function categorizeNonAscii(items) {
+        const ranges = {};
+        items.forEach(item => {
+            const dt = item.dateTime ? new Date(item.dateTime) : null;
+            const time = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-';
+            const title = item.title || 'Untitled';
+            const progKey = time + '|' + title;
+            const fields = extractTextFields(item);
+
+            fields.forEach(({ fieldName, value }) => {
+                for (const ch of value) {
+                    const cp = ch.codePointAt(0);
+                    if (cp <= 127) continue;
+                    const rangeName = getRangeName(cp);
+                    if (!ranges[rangeName]) {
+                        ranges[rangeName] = { count: 0, uniqueChars: new Set(), programmes: new Set(), fields: new Set() };
+                    }
+                    const r = ranges[rangeName];
+                    r.count++;
+                    r.uniqueChars.add(ch);
+                    r.programmes.add(progKey);
+                    r.fields.add(progKey + '|' + fieldName);
+                }
+            });
+        });
+        return ranges;
+    }
+
     function checkUnicode(items) {
         const results = [];
         items.forEach(item => {
@@ -303,10 +399,11 @@ const ScheduleView = (() => {
                 }
             });
         });
-        renderUnicodeResults(results, items.length);
+        const nonAscii = categorizeNonAscii(items);
+        renderUnicodeResults(results, items.length, nonAscii);
     }
 
-    function renderUnicodeResults(results, totalProgrammes) {
+    function renderUnicodeResults(results, totalProgrammes, nonAscii) {
         const panel = document.getElementById('unicode-results');
         panel.style.display = '';
         panel.innerHTML = '';
@@ -314,6 +411,7 @@ const ScheduleView = (() => {
         const affectedProgrammes = new Set(results.map(r => r.time + r.title)).size;
         const totalIssues = results.reduce((sum, r) => sum + r.issues.length, 0);
 
+        // --- Error summary banner ---
         const summary = document.createElement('div');
         summary.className = 'card';
         summary.style.borderLeftWidth = '4px';
@@ -342,70 +440,143 @@ const ScheduleView = (() => {
         panel.appendChild(summary);
         panel.querySelector('#unicode-close').addEventListener('click', () => { panel.style.display = 'none'; });
 
-        if (totalIssues === 0) return;
+        // --- Error detail cards ---
+        if (totalIssues > 0) {
+            const issueList = document.createElement('div');
+            issueList.style.cssText = 'margin-top:8px;max-height:500px;overflow-y:auto';
 
-        const issueList = document.createElement('div');
-        issueList.style.cssText = 'margin-top:8px;max-height:500px;overflow-y:auto';
+            const badgeForType = {
+                'replacement': 'badge-orange', 'mojibake': 'badge-orange',
+                'html-entity': 'badge-blue', 'invisible': 'badge-purple',
+                'control': 'badge-orange', 'private-use': 'badge-gray'
+            };
 
-        const badgeForType = {
-            'replacement': 'badge-orange', 'mojibake': 'badge-orange',
-            'html-entity': 'badge-blue', 'invisible': 'badge-purple',
-            'control': 'badge-orange', 'private-use': 'badge-gray'
-        };
+            results.forEach(result => {
+                result.issues.forEach(issue => {
+                    const row = document.createElement('div');
+                    row.className = 'card';
+                    row.style.cssText = 'padding:10px 16px;margin-bottom:6px';
 
-        results.forEach(result => {
-            result.issues.forEach(issue => {
-                const row = document.createElement('div');
-                row.className = 'card';
-                row.style.cssText = 'padding:10px 16px;margin-bottom:6px';
+                    const ctxRadius = 40;
+                    const start = Math.max(0, issue.index - ctxRadius);
+                    const end = Math.min(result.value.length, issue.index + issue.length + ctxRadius);
+                    const before = result.value.slice(start, issue.index);
+                    const bad = result.value.slice(issue.index, issue.index + issue.length);
+                    const after = result.value.slice(issue.index + issue.length, end);
+                    const prefix = start > 0 ? '...' : '';
+                    const suffix = end < result.value.length ? '...' : '';
 
-                const ctxRadius = 40;
-                const start = Math.max(0, issue.index - ctxRadius);
-                const end = Math.min(result.value.length, issue.index + issue.length + ctxRadius);
-                const before = result.value.slice(start, issue.index);
-                const bad = result.value.slice(issue.index, issue.index + issue.length);
-                const after = result.value.slice(issue.index + issue.length, end);
-                const prefix = start > 0 ? '...' : '';
-                const suffix = end < result.value.length ? '...' : '';
+                    const isVisible = bad.trim().length > 0 && !/^[\x00-\x1F\x7F-\x9F\u00A0\u00AD\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060\u2066-\u2069\uFEFF]+$/.test(bad);
 
-                const isVisible = bad.trim().length > 0 && !/^[\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF\u00AD]+$/.test(bad);
-
-                row.innerHTML = `
-                    <div style="display:flex;gap:10px;align-items:start">
-                        <div style="min-width:56px;text-align:center">
-                            <div style="font-weight:700;color:var(--color-accent);font-size:14px">${API.escapeHtml(result.time)}</div>
-                        </div>
-                        <div style="flex:1;min-width:0">
-                            <div style="font-weight:600;font-size:14px">${API.escapeHtml(result.title)}</div>
-                            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">
-                                Field: <code style="font-size:11px">${API.escapeHtml(result.fieldName)}</code>
-                                <span class="badge ${badgeForType[issue.type] || 'badge-gray'}" style="margin-left:6px">${API.escapeHtml(issue.description)}</span>
+                    row.innerHTML = `
+                        <div style="display:flex;gap:10px;align-items:start">
+                            <div style="min-width:56px;text-align:center">
+                                <div style="font-weight:700;color:var(--color-accent);font-size:14px">${API.escapeHtml(result.time)}</div>
                             </div>
-                            <div style="margin-top:6px;font-size:13px;padding:6px 10px;border-radius:4px;background:var(--color-bg);font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace;word-break:break-word" class="unicode-ctx"></div>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:600;font-size:14px">${API.escapeHtml(result.title)}</div>
+                                <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">
+                                    Field: <code style="font-size:11px">${API.escapeHtml(result.fieldName)}</code>
+                                    <span class="badge ${badgeForType[issue.type] || 'badge-gray'}" style="margin-left:6px">${API.escapeHtml(issue.description)}</span>
+                                </div>
+                                <div style="margin-top:6px;font-size:13px;padding:6px 10px;border-radius:4px;background:var(--color-bg);font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace;word-break:break-word" class="unicode-ctx"></div>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
 
-                const ctx = row.querySelector('.unicode-ctx');
-                if (prefix) ctx.appendChild(document.createTextNode('...'));
-                ctx.appendChild(document.createTextNode(before));
-                const mark = document.createElement('mark');
-                mark.className = 'unicode-highlight';
-                if (isVisible) {
-                    mark.textContent = bad;
-                } else {
-                    const cp = bad.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
-                    mark.innerHTML = `<span style="font-size:10px;font-style:italic">[U+${cp}]</span>`;
-                }
-                ctx.appendChild(mark);
-                ctx.appendChild(document.createTextNode(after));
-                if (suffix) ctx.appendChild(document.createTextNode('...'));
+                    const ctx = row.querySelector('.unicode-ctx');
+                    if (prefix) ctx.appendChild(document.createTextNode('...'));
+                    ctx.appendChild(document.createTextNode(before));
+                    const mark = document.createElement('mark');
+                    mark.className = 'unicode-highlight';
+                    if (isVisible) {
+                        mark.textContent = bad;
+                    } else {
+                        const cp = bad.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+                        mark.innerHTML = `<span style="font-size:10px;font-style:italic">[U+${cp}]</span>`;
+                    }
+                    ctx.appendChild(mark);
+                    ctx.appendChild(document.createTextNode(after));
+                    if (suffix) ctx.appendChild(document.createTextNode('...'));
 
-                issueList.appendChild(row);
+                    issueList.appendChild(row);
+                });
             });
-        });
+            panel.appendChild(issueList);
+        }
 
-        panel.appendChild(issueList);
+        // --- Non-ASCII character summary ---
+        const rangeNames = Object.keys(nonAscii);
+        if (rangeNames.length > 0) {
+            const totalNonAscii = rangeNames.reduce((sum, k) => sum + nonAscii[k].count, 0);
+
+            const section = document.createElement('div');
+            section.className = 'card';
+            section.style.cssText = 'margin-top:12px;border-left:4px solid var(--color-accent)';
+
+            const header = document.createElement('label');
+            header.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--color-text-secondary)';
+            header.setAttribute('role', 'button');
+            header.innerHTML = `<input type="checkbox" style="cursor:pointer" aria-label="Toggle non-ASCII summary"> Non-ASCII Characters &mdash; ${totalNonAscii.toLocaleString()} chars across ${rangeNames.length} range(s)`;
+            section.appendChild(header);
+
+            const tableWrap = document.createElement('div');
+            tableWrap.style.display = 'none';
+
+            const table = document.createElement('table');
+            table.style.cssText = 'width:100%;border-collapse:collapse;margin-top:10px;font-size:13px';
+            table.innerHTML = `<thead><tr style="text-align:left;border-bottom:2px solid var(--color-border)">
+                <th style="padding:6px 8px">Range</th>
+                <th style="padding:6px 8px;text-align:right">Count</th>
+                <th style="padding:6px 8px;text-align:right">Programmes</th>
+                <th style="padding:6px 8px">Characters</th>
+            </tr></thead>`;
+
+            const tbody = document.createElement('tbody');
+            rangeNames
+                .sort((a, b) => nonAscii[b].count - nonAscii[a].count)
+                .forEach(name => {
+                    const r = nonAscii[name];
+                    const chars = [...r.uniqueChars];
+                    const displayed = chars.slice(0, 30);
+                    const more = chars.length > 30 ? ` +${chars.length - 30} more` : '';
+
+                    const tr = document.createElement('tr');
+                    tr.style.cssText = 'border-bottom:1px solid var(--color-border)';
+                    tr.innerHTML = `
+                        <td style="padding:6px 8px;font-weight:600">${API.escapeHtml(name)}</td>
+                        <td style="padding:6px 8px;text-align:right">${r.count.toLocaleString()}</td>
+                        <td style="padding:6px 8px;text-align:right">${r.programmes.size}</td>
+                        <td style="padding:6px 8px"></td>
+                    `;
+                    const charCell = tr.lastElementChild;
+                    const charSpan = document.createElement('span');
+                    charSpan.style.cssText = 'font-family:"SF Mono",Monaco,"Cascadia Code",Consolas,monospace;letter-spacing:2px;font-size:14px';
+                    charSpan.textContent = displayed.join(' ');
+                    charCell.appendChild(charSpan);
+                    if (more) {
+                        const moreSpan = document.createElement('span');
+                        moreSpan.style.cssText = 'font-size:11px;color:var(--color-text-secondary);margin-left:6px';
+                        moreSpan.textContent = more;
+                        charCell.appendChild(moreSpan);
+                    }
+                    tbody.appendChild(tr);
+                });
+
+            table.appendChild(tbody);
+            tableWrap.appendChild(table);
+            section.appendChild(tableWrap);
+
+            const checkbox = header.querySelector('input');
+            checkbox.addEventListener('change', (e) => {
+                tableWrap.style.display = e.target.checked ? 'block' : 'none';
+                header.setAttribute('aria-expanded', String(e.target.checked));
+            });
+            header.setAttribute('aria-expanded', 'false');
+
+            panel.appendChild(section);
+        }
+
         API.smoothScroll(panel);
     }
 
