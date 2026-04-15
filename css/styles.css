@@ -1155,6 +1155,20 @@ body {
     color: #7ee787;
 }
 
+/* ===== Unicode Check ===== */
+.unicode-highlight {
+    background: #fecaca;
+    color: #b91c1c;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-weight: 700;
+}
+
+[data-theme="dark"] .unicode-highlight {
+    background: rgba(248, 113, 113, 0.25);
+    color: #fca5a5;
+}
+
 /* ===== Instructions ===== */
 .instructions-grid {
     display: grid;

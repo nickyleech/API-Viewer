@@ -18,7 +18,7 @@ const InstructionsView = (() => {
 
                 <div class="instruction-card">
                     <h3><a href="#schedule" class="instruction-link">Schedule</a></h3>
-                    <p>View the full daily schedule for any channel. Select a channel and date, then click <strong>Load Schedule</strong> to see every programme in time order. Click any programme to view its full details including synopsis, series info, and images. You can also flag programmes for review.</p>
+                    <p>View the full daily schedule for any channel. Select a channel and date, then click <strong>Load Schedule</strong> to see every programme in time order. Click any programme to view its full details including synopsis, series info, and images. You can also flag programmes for review. Use the <strong>Check Unicode</strong> button to scan all programme text fields for encoding errors such as mojibake, unresolved HTML entities, invisible characters, and control characters.</p>
                 </div>
 
                 <div class="instruction-card">
