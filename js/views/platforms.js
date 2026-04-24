@@ -6,9 +6,14 @@ const PlatformsView = (() => {
             <div class="view-header">
                 <h2>Platforms</h2>
                 <p>Browse available TV platforms and their regions. Click a platform to see its available regions.</p>
+                <div style="margin-top:10px">
+                    <button class="btn btn-sm btn-secondary" id="vod-catalogue-btn">VOD Catalogue IDs</button>
+                </div>
             </div>
+            <div id="vod-catalogue-section" style="display:none"></div>
             <div id="platforms-list"></div>
         `;
+        document.getElementById('vod-catalogue-btn').addEventListener('click', loadVodCatalogue);
         await loadPlatforms();
     }
 
@@ -142,6 +147,91 @@ const PlatformsView = (() => {
         });
 
         container.firstElementChild.after(API.jsonToggle(data));
+    }
+
+    async function loadVodCatalogue() {
+        const section = document.getElementById('vod-catalogue-section');
+        const btn = document.getElementById('vod-catalogue-btn');
+
+        // Toggle off if already showing
+        if (section.style.display !== 'none') {
+            section.style.display = 'none';
+            btn.textContent = 'VOD Catalogue IDs';
+            return;
+        }
+
+        section.style.display = 'block';
+        btn.textContent = 'Hide VOD Catalogue';
+        API.showLoading(section);
+
+        const key = API.getApiKey();
+        if (!key) {
+            API.showError(section, 'No API key configured. Please set your API key.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`https://tv.api.pressassociation.io/v2/catalogue?apikey=${encodeURIComponent(key)}`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            renderVodCatalogue(section, data);
+        } catch (err) {
+            API.showError(section, err.message);
+        }
+    }
+
+    function renderVodCatalogue(container, data) {
+        container.innerHTML = '';
+
+        const items = data.item || data.catalogues || (Array.isArray(data) ? data : [data]);
+        if (!items || items.length === 0) {
+            API.showEmpty(container, 'No VOD catalogues found.');
+            return;
+        }
+
+        const heading = document.createElement('h3');
+        heading.style.margin = '0 0 12px';
+        heading.textContent = 'VOD Catalogues';
+        container.appendChild(heading);
+
+        const info = document.createElement('div');
+        info.className = 'results-info';
+        info.textContent = `${data.total || items.length} catalogue(s)`;
+        container.appendChild(info);
+
+        container.appendChild(API.jsonToggle(data));
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Catalogue ID</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        container.appendChild(table);
+
+        const tbody = table.querySelector('tbody');
+        items.forEach(cat => {
+            const tr = document.createElement('tr');
+            const title = cat.title || cat.name || 'Unnamed';
+            const id = cat.id || cat.catalogueId || '-';
+            tr.innerHTML = `
+                <td><strong>${API.escapeHtml(title)}</strong></td>
+                <td><code style="font-size:12px;color:var(--color-accent);user-select:all">${API.escapeHtml(id)}</code></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Add separator below
+        const hr = document.createElement('hr');
+        hr.style.margin = '20px 0';
+        container.appendChild(hr);
     }
 
     return { render };
