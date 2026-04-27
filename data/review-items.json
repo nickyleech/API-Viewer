@@ -2,6 +2,18 @@
   "version": 1,
   "items": [
     {
+      "id": "a4ea4819-b94e-58e1-a090-1841e7c67e3b",
+      "title": "BBC News at One; Weather",
+      "note": "Needs updating",
+      "channel": "BBC One London",
+      "channelId": "2a548fcc-55e9-561d-9a77-f485fb69dad1",
+      "dateTime": "2026-04-27T12:00:00.000Z",
+      "assetId": "25d228d4-8104-52c3-9933-9a92f28f23be",
+      "source": "images",
+      "addedAt": "2026-04-27T14:29:55.417Z",
+      "checking": false
+    },
+    {
       "id": "51404571-2f2b-5a79-a92b-0c06e063b138",
       "title": "A&E After Dark",
       "note": "I don't think all series are from Hull",
